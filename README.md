@@ -100,7 +100,7 @@ docker compose down -v
 ```
 
 - Use `docker compose down -v` only if you want to remove the PostgreSQL volume and force a fresh reseed on next startup.
-- PostgreSQL is published on `localhost:5433` for optional host-side access. The app container still connects internally on `db:5432`.
+- PostgreSQL is only exposed inside the Docker network. The app container connects internally on `db:5432`, and no host DB port is published.
 
 ## Prisma Workflow
 
