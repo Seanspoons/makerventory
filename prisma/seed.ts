@@ -330,7 +330,26 @@ async function main() {
     ],
   });
 
-  const filamentEntries = [
+  const filamentEntries: Array<
+    [
+      string,
+      string,
+      string | null,
+      string | null,
+      string,
+      number,
+      number,
+      boolean,
+      boolean,
+      FilamentHygroscopicLevel,
+      string,
+      string,
+      StockStatus,
+      boolean,
+      boolean,
+      string,
+    ]
+  > = [
     ["Bambu Lab", "PLA", null, null, "White", 2, 1700, false, false, FilamentHygroscopicLevel.LOW, "Shelf A1", "Bambu Lab Store", StockStatus.HEALTHY, false, false, "Reliable default stock for prototyping."],
     ["Bambu Lab", "PLA", null, null, "Cocoa Brown", 1, 620, false, false, FilamentHygroscopicLevel.LOW, "Shelf A1", "Bambu Lab Store", StockStatus.HEALTHY, true, false, "Good for planters and accessory parts."],
     ["ELEGOO", "PLA+", null, null, "Black", 5, 3900, false, false, FilamentHygroscopicLevel.LOW, "Shelf A2", "Amazon", StockStatus.HEALTHY, true, false, "Bulk utility PLA+ for fixtures and shop helpers."],
@@ -355,7 +374,7 @@ async function main() {
     ["Bambu Lab", "TPU", "90A", null, "White", 1, 770, true, false, FilamentHygroscopicLevel.HIGH, "Dryer Shelf", "Bambu Lab Store", StockStatus.HEALTHY, false, false, "Mostly sealed."],
     ["Bambu Lab", "TPU", "85A", null, "Neon Orange", 1, 360, true, false, FilamentHygroscopicLevel.HIGH, "Dryer Shelf", "Bambu Lab Store", StockStatus.LOW, true, true, "Very soft; dry before use."],
     ["Siraya Tech", "TPU", "85A", null, "Black", 1, 610, true, false, FilamentHygroscopicLevel.HIGH, "Dryer Shelf", "Amazon", StockStatus.HEALTHY, true, false, "Excellent grip material for flexible parts."],
-  ] as const;
+  ];
 
   for (const entry of filamentEntries) {
     const [
