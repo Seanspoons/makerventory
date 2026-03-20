@@ -72,7 +72,7 @@ npm run dev
 docker compose up --build
 ```
 
-2. Open `http://localhost:3000`.
+2. Open `http://localhost:3001`.
 
 What happens on startup:
 
