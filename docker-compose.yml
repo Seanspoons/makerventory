@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: makerventory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: makerventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - makerventory-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d makerventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: makerventory-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/makerventory
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      SEED_ON_START: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - makerventory-node-modules:/app/node_modules
+      - makerventory-next-cache:/app/.next
+    command: ["sh", "./scripts/docker-entrypoint.sh"]
+
+volumes:
+  makerventory-postgres-data:
+  makerventory-node-modules:
+  makerventory-next-cache:

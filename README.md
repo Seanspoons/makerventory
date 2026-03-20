@@ -64,6 +64,35 @@ npm run dev
 
 6. Open `http://localhost:3000`.
 
+## Docker Quick Start
+
+1. Start the full local stack:
+
+```bash
+docker compose up --build
+```
+
+2. Open `http://localhost:3000`.
+
+What happens on startup:
+
+- PostgreSQL starts in a dedicated container
+- the app waits for the database to become reachable
+- Prisma Client is generated
+- `prisma db push` applies the schema
+- the seed runs only if the database is empty
+- Next.js starts in development mode with file watching enabled
+
+Useful Docker commands:
+
+```bash
+docker compose up --build
+docker compose down
+docker compose down -v
+```
+
+- Use `docker compose down -v` only if you want to remove the PostgreSQL volume and force a fresh reseed on next startup.
+
 ## Prisma Workflow
 
 - Generate Prisma Client:
@@ -125,6 +154,12 @@ Production build verified with:
 
 ```bash
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/makerventory" npm run build
+```
+
+Docker stack can be validated with:
+
+```bash
+docker compose config
 ```
 
 ## Notes
