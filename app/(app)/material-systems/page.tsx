@@ -1,6 +1,7 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -63,7 +64,33 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                   {item.supportedMaterialsNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{item.supportedMaterialsNotes}</p> : null}
                   {item.notes ? <p className="mt-2 text-sm leading-6 text-slate-500">{item.notes}</p> : null}
                 </div>
-                <ArchiveForm id={item.id} kind="material-system" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update the material system or dryer record.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="material-system" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Select name="type" defaultValue={item.type}>
+                        <option value="AMS_LITE">AMS Lite</option>
+                        <option value="AMS_2_PRO">AMS 2 Pro</option>
+                        <option value="AMS_HT">AMS HT</option>
+                        <option value="DRYER">Dryer</option>
+                      </Select>
+                      <Select name="status" defaultValue={item.status}>
+                        <option value="ACTIVE">Active</option>
+                        <option value="STANDBY">Standby</option>
+                        <option value="MAINTENANCE">Maintenance</option>
+                        <option value="OFFLINE">Offline</option>
+                        <option value="ARCHIVED">Archived</option>
+                      </Select>
+                      <div />
+                      <Textarea name="supportedMaterialsNotes" defaultValue={item.supportedMaterialsNotes ?? ""} className="lg:col-span-2" />
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="material-system" />
+                </div>
               </div>
             </div>
           ))}

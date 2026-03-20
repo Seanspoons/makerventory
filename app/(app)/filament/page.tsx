@@ -1,6 +1,7 @@
-import { createInventoryItem, updateFilamentState } from "@/app/actions";
+import { createInventoryItem, updateFilamentState, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -207,6 +208,115 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-col items-end gap-2">
+                      <EditDialog
+                        title={`Edit ${item.brand} ${item.color} ${item.materialType}`}
+                        description="Update stock, handling, and recommendation fields for this filament record."
+                      >
+                        <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                          <input type="hidden" name="kind" value="filament" />
+                          <input type="hidden" name="id" value={item.id} />
+                          <Input name="brand" defaultValue={item.brand} required />
+                          <Input name="materialType" defaultValue={item.materialType} required />
+                          <Input name="subtype" defaultValue={item.subtype ?? ""} />
+                          <Input name="finish" defaultValue={item.finish ?? ""} />
+                          <Input name="color" defaultValue={item.color} required />
+                          <Input name="quantity" type="number" defaultValue={item.quantity} required />
+                          <Input
+                            name="estimatedRemainingGrams"
+                            type="number"
+                            defaultValue={item.estimatedRemainingGrams ?? 1000}
+                          />
+                          <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
+                          <Select name="status" defaultValue={item.status}>
+                            <option value="HEALTHY">Healthy</option>
+                            <option value="LOW">Low</option>
+                            <option value="OUT">Out</option>
+                            <option value="ARCHIVED">Archived</option>
+                          </Select>
+                          <Select
+                            name="hygroscopicLevel"
+                            defaultValue={item.hygroscopicLevel ?? ""}
+                          >
+                            <option value="">Unspecified</option>
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                          </Select>
+                          <Input
+                            name="recommendedNozzle"
+                            defaultValue={
+                              item.filamentRecommendation?.recommendedNozzle ?? ""
+                            }
+                          />
+                          <div className="flex flex-wrap gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="opened"
+                                defaultChecked={item.opened}
+                              />
+                              Opened
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="nearlyEmpty"
+                                defaultChecked={item.nearlyEmpty}
+                              />
+                              Nearly empty
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="abrasive"
+                                defaultChecked={Boolean(item.abrasive)}
+                              />
+                              Abrasive
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="dryingRequired"
+                                defaultChecked={Boolean(item.dryingRequired)}
+                              />
+                              Drying required
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="dryerSuggested"
+                                defaultChecked={Boolean(
+                                  item.filamentRecommendation?.dryerSuggested,
+                                )}
+                              />
+                              Dryer suggested
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                name="hardenedNozzleNeeded"
+                                defaultChecked={Boolean(
+                                  item.filamentRecommendation?.hardenedNozzleNeeded,
+                                )}
+                              />
+                              Hardened nozzle needed
+                            </label>
+                          </div>
+                          <Textarea
+                            name="notes"
+                            defaultValue={item.notes ?? ""}
+                            className="lg:col-span-2"
+                          />
+                          <Textarea
+                            name="recommendationNotes"
+                            defaultValue={item.filamentRecommendation?.notes ?? ""}
+                            className="lg:col-span-2"
+                          />
+                          <div className="lg:col-span-2">
+                            <SubmitButton>Save changes</SubmitButton>
+                          </div>
+                        </form>
+                      </EditDialog>
                       <form action={updateFilamentState} className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                         <input type="hidden" name="id" value={item.id} />
                         <input type="hidden" name="opened" value={item.opened ? "false" : "true"} />

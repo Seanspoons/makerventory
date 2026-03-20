@@ -1,12 +1,14 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getSmartPlugs } from "@/lib/data";
 
@@ -48,7 +50,28 @@ export default async function SmartPlugsPage(props: { searchParams?: SearchParam
                   <p className="mt-2 text-sm text-slate-500">{item.assignedDeviceLabel ?? item.printer?.name ?? "Unassigned"}</p>
                   <p className="mt-2 text-sm text-slate-600">{item.powerMonitoringCapable ? "Power monitoring enabled" : "Switch-only control"}</p>
                 </div>
-                <ArchiveForm id={item.id} kind="smart-plug" label="Disable" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update assignment, status, and monitoring capability.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="smart-plug" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Input name="assignedDeviceLabel" defaultValue={item.assignedDeviceLabel ?? ""} />
+                      <Select name="status" defaultValue={item.status}>
+                        <option value="ONLINE">Online</option>
+                        <option value="OFFLINE">Offline</option>
+                        <option value="DISABLED">Disabled</option>
+                      </Select>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" name="powerMonitoringCapable" defaultChecked={item.powerMonitoringCapable} />
+                        Power monitoring capable
+                      </label>
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="smart-plug" label="Disable" />
+                </div>
               </div>
             </div>
           ))}

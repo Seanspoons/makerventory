@@ -1,12 +1,14 @@
 "use server";
 
 import {
+  FilamentHygroscopicLevel,
   MaterialSystemType,
   MaintenanceActionType,
   StockStatus,
   WishlistPriority,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { setFlashMessage } from "@/lib/flash";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 
@@ -44,6 +46,10 @@ function revalidateInventory() {
     "/wishlist",
     "/maintenance",
   ].forEach((path) => revalidatePath(path));
+}
+
+function booleanValue(formData: FormData, key: string) {
+  return formData.get(key) === "on" || formData.get(key) === "true";
 }
 
 export async function createInventoryItem(formData: FormData) {
@@ -230,6 +236,231 @@ export async function createInventoryItem(formData: FormData) {
       throw new Error(`Unsupported inventory kind: ${kind}`);
   }
 
+  await setFlashMessage({
+    type: "success",
+    title: "Record created",
+    message: "The inventory record was added successfully.",
+  });
+  revalidateInventory();
+}
+
+export async function updateInventoryItem(formData: FormData) {
+  const kind = requiredString(formData, "kind");
+  const id = requiredString(formData, "id");
+
+  switch (kind) {
+    case "printer":
+      await prisma.printer.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          brand: requiredString(formData, "brand"),
+          model: requiredString(formData, "model"),
+          status: requiredString(formData, "status") as
+            | "ACTIVE"
+            | "MAINTENANCE"
+            | "OFFLINE"
+            | "ARCHIVED",
+          buildVolumeX: numberValue(formData, "buildVolumeX", 180),
+          buildVolumeY: numberValue(formData, "buildVolumeY", 180),
+          buildVolumeZ: numberValue(formData, "buildVolumeZ", 180),
+          location: optionalString(formData, "location"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "material-system":
+      await prisma.materialSystem.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          type: requiredString(formData, "type") as MaterialSystemType,
+          status: requiredString(formData, "status") as
+            | "ACTIVE"
+            | "STANDBY"
+            | "MAINTENANCE"
+            | "OFFLINE"
+            | "ARCHIVED",
+          supportedMaterialsNotes: optionalString(formData, "supportedMaterialsNotes"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "build-plate":
+      await prisma.buildPlate.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          sizeLabel: requiredString(formData, "sizeLabel"),
+          sizeMm: numberValue(formData, "sizeMm", 256),
+          surfaceType: requiredString(formData, "surfaceType"),
+          status: requiredString(formData, "status") as
+            | "AVAILABLE"
+            | "IN_USE"
+            | "WORN"
+            | "RETIRED",
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "hotend":
+      await prisma.hotend.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          nozzleSize: numberValue(formData, "nozzleSize", 0.4),
+          materialType: requiredString(formData, "materialType"),
+          quantity: numberValue(formData, "quantity", 1),
+          inUseCount: numberValue(formData, "inUseCount", 0),
+          spareCount: numberValue(formData, "spareCount", 0),
+          status: requiredString(formData, "status") as
+            | "AVAILABLE"
+            | "IN_USE"
+            | "LOW_STOCK"
+            | "RETIRED",
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "filament":
+      await prisma.filamentSpool.update({
+        where: { id },
+        data: {
+          brand: requiredString(formData, "brand"),
+          materialType: requiredString(formData, "materialType"),
+          subtype: optionalString(formData, "subtype"),
+          finish: optionalString(formData, "finish"),
+          color: requiredString(formData, "color"),
+          quantity: numberValue(formData, "quantity", 1),
+          estimatedRemainingGrams: numberValue(formData, "estimatedRemainingGrams", 1000),
+          storageLocation: optionalString(formData, "storageLocation"),
+          status: requiredString(formData, "status") as
+            | "HEALTHY"
+            | "LOW"
+            | "OUT"
+            | "ARCHIVED",
+          opened: booleanValue(formData, "opened"),
+          nearlyEmpty: booleanValue(formData, "nearlyEmpty"),
+          abrasive: booleanValue(formData, "abrasive"),
+          dryingRequired: booleanValue(formData, "dryingRequired"),
+          hygroscopicLevel:
+            (optionalString(formData, "hygroscopicLevel") as FilamentHygroscopicLevel | null) ??
+            null,
+          compatibilityTags: booleanValue(formData, "abrasive")
+            ? ["Abrasive", "Hardened Nozzle"]
+            : booleanValue(formData, "dryingRequired")
+              ? ["Dryer Recommended"]
+              : ["General Purpose"],
+          notes: optionalString(formData, "notes"),
+          filamentRecommendation: {
+            upsert: {
+              create: {
+                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                notes: optionalString(formData, "recommendationNotes"),
+              },
+              update: {
+                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                notes: optionalString(formData, "recommendationNotes"),
+              },
+            },
+          },
+        },
+      });
+      break;
+    case "consumable":
+      await prisma.consumableItem.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          category: requiredString(formData, "category"),
+          quantity: numberValue(formData, "quantity", 1),
+          unit: requiredString(formData, "unit"),
+          reorderThreshold: numberValue(formData, "reorderThreshold", 1),
+          status: requiredString(formData, "status") as
+            | "HEALTHY"
+            | "LOW"
+            | "OUT"
+            | "ARCHIVED",
+          storageLocation: optionalString(formData, "storageLocation"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "safety":
+      await prisma.safetyEquipment.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          type: requiredString(formData, "type"),
+          status: requiredString(formData, "status") as
+            | "ACTIVE"
+            | "NEEDS_ATTENTION"
+            | "PLANNED"
+            | "ARCHIVED",
+          replacementSchedule: optionalString(formData, "replacementSchedule"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "smart-plug":
+      await prisma.smartPlug.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          status: requiredString(formData, "status") as
+            | "ONLINE"
+            | "OFFLINE"
+            | "DISABLED",
+          assignedDeviceLabel: optionalString(formData, "assignedDeviceLabel"),
+          powerMonitoringCapable: booleanValue(formData, "powerMonitoringCapable"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "tool":
+      await prisma.toolPart.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          category: requiredString(formData, "category"),
+          quantity: numberValue(formData, "quantity", 1),
+          storageLocation: optionalString(formData, "storageLocation"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    case "wishlist":
+      await prisma.wishlistItem.update({
+        where: { id },
+        data: {
+          name: requiredString(formData, "name"),
+          category: requiredString(formData, "category"),
+          priority: requiredString(formData, "priority") as WishlistPriority,
+          status: requiredString(formData, "status") as
+            | "PLANNED"
+            | "RESEARCHING"
+            | "READY_TO_BUY"
+            | "PURCHASED",
+          estimatedCost: numberValue(formData, "estimatedCost", 0),
+          vendor: optionalString(formData, "vendor"),
+          purchaseUrl: optionalString(formData, "purchaseUrl"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+      break;
+    default:
+      throw new Error(`Unsupported update kind: ${kind}`);
+  }
+
+  await setFlashMessage({
+    type: "success",
+    title: "Record updated",
+    message: "Your changes were saved successfully.",
+  });
   revalidateInventory();
 }
 
@@ -275,6 +506,11 @@ export async function archiveInventoryItem(formData: FormData) {
       throw new Error(`Unsupported archive kind: ${kind}`);
   }
 
+  await setFlashMessage({
+    type: "success",
+    title: "Record updated",
+    message: "The selected record was updated successfully.",
+  });
   revalidateInventory();
 }
 
@@ -294,6 +530,11 @@ export async function updateFilamentState(formData: FormData) {
     },
   });
 
+  await setFlashMessage({
+    type: "success",
+    title: "Filament state updated",
+    message: "The spool status was updated.",
+  });
   revalidatePath("/filament");
   revalidatePath("/");
 }
@@ -319,6 +560,11 @@ export async function createMaintenanceLog(formData: FormData) {
     },
   });
 
+  await setFlashMessage({
+    type: "success",
+    title: "Maintenance logged",
+    message: "The maintenance event was recorded successfully.",
+  });
   revalidatePath("/maintenance");
   revalidatePath("/");
 }

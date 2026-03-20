@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -126,6 +127,31 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-end gap-2">
+                        <EditDialog
+                          title={`Edit ${printer.name}`}
+                          description="Update the core printer record."
+                        >
+                          <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                            <input type="hidden" name="kind" value="printer" />
+                            <input type="hidden" name="id" value={printer.id} />
+                            <Input name="name" defaultValue={printer.name} required />
+                            <Input name="brand" defaultValue={printer.brand} required />
+                            <Input name="model" defaultValue={printer.model} required />
+                            <Input name="location" defaultValue={printer.location ?? ""} />
+                            <Select name="status" defaultValue={printer.status}>
+                              <option value="ACTIVE">Active</option>
+                              <option value="MAINTENANCE">Maintenance</option>
+                              <option value="OFFLINE">Offline</option>
+                              <option value="ARCHIVED">Archived</option>
+                            </Select>
+                            <div />
+                            <Input name="buildVolumeX" type="number" defaultValue={printer.buildVolumeX} required />
+                            <Input name="buildVolumeY" type="number" defaultValue={printer.buildVolumeY} required />
+                            <Input name="buildVolumeZ" type="number" defaultValue={printer.buildVolumeZ} required />
+                            <Textarea name="notes" defaultValue={printer.notes ?? ""} className="lg:col-span-2" />
+                            <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                          </form>
+                        </EditDialog>
                         <Link href={`/printers/${printer.slug}`} className="text-sm font-medium text-slate-700 hover:text-slate-950">
                           Details
                         </Link>

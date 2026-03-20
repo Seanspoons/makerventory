@@ -1,5 +1,5 @@
 import { archiveInventoryItem } from "@/app/actions";
-import { SubmitButton } from "@/components/forms/submit-button";
+import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 
 export function ArchiveForm({
   id,
@@ -11,12 +11,15 @@ export function ArchiveForm({
   label?: string;
 }) {
   return (
-    <form action={archiveInventoryItem}>
+    <ConfirmActionForm
+      action={archiveInventoryItem}
+      title={`${label} record?`}
+      description="This change is persisted immediately. Use this for archiving, retiring, disabling, deleting, or marking the selected record as purchased."
+      confirmLabel={label}
+      triggerLabel={label}
+    >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="kind" value={kind} />
-      <SubmitButton variant="ghost" size="sm">
-        {label}
-      </SubmitButton>
-    </form>
+    </ConfirmActionForm>
   );
 }

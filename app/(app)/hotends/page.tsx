@@ -1,6 +1,7 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -58,7 +59,30 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                   <p className="mt-2 text-sm text-slate-600">Quantity {item.quantity} · In use {item.inUseCount} · Spare {item.spareCount}</p>
                   <p className="mt-2 text-sm text-slate-500">Compatible printers: {item.compatiblePrinters.map((printer) => printer.printer.name).join(", ") || "None configured"}</p>
                 </div>
-                <ArchiveForm id={item.id} kind="hotend" label="Retire" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update nozzle sizing, stock counts, and status.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="hotend" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Input name="materialType" defaultValue={item.materialType} required />
+                      <Input name="nozzleSize" type="number" step="0.1" defaultValue={item.nozzleSize.toString()} required />
+                      <Input name="quantity" type="number" defaultValue={item.quantity} required />
+                      <Input name="inUseCount" type="number" defaultValue={item.inUseCount} required />
+                      <Input name="spareCount" type="number" defaultValue={item.spareCount} required />
+                      <Select name="status" defaultValue={item.status}>
+                        <option value="AVAILABLE">Available</option>
+                        <option value="IN_USE">In use</option>
+                        <option value="LOW_STOCK">Low stock</option>
+                        <option value="RETIRED">Retired</option>
+                      </Select>
+                      <div />
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="hotend" label="Retire" />
+                </div>
               </div>
             </div>
           ))}

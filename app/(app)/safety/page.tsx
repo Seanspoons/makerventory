@@ -1,12 +1,14 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getSafetyEquipment } from "@/lib/data";
 
@@ -48,7 +50,26 @@ export default async function SafetyPage(props: { searchParams?: SearchParams })
                   {item.replacementSchedule ? <p className="mt-2 text-sm text-slate-600">{item.replacementSchedule}</p> : null}
                   {item.notes ? <p className="mt-2 text-sm text-slate-500">{item.notes}</p> : null}
                 </div>
-                <ArchiveForm id={item.id} kind="safety" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update safety status, schedule, and notes.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="safety" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Input name="type" defaultValue={item.type} required />
+                      <Select name="status" defaultValue={item.status}>
+                        <option value="ACTIVE">Active</option>
+                        <option value="NEEDS_ATTENTION">Needs attention</option>
+                        <option value="PLANNED">Planned</option>
+                        <option value="ARCHIVED">Archived</option>
+                      </Select>
+                      <Input name="replacementSchedule" defaultValue={item.replacementSchedule ?? ""} />
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="safety" />
+                </div>
               </div>
             </div>
           ))}

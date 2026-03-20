@@ -1,6 +1,7 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -144,7 +145,34 @@ export default async function WishlistPage(props: { searchParams?: SearchParams 
                       </a>
                     ) : null}
                   </div>
-                  <ArchiveForm id={item.id} kind="wishlist" label={item.status === "PURCHASED" ? "Purchased" : "Mark purchased"} />
+                  <div className="flex items-center gap-2">
+                    <EditDialog title={`Edit ${item.name}`} description="Update priority, vendor details, and buying status.">
+                      <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                        <input type="hidden" name="kind" value="wishlist" />
+                        <input type="hidden" name="id" value={item.id} />
+                        <Input name="name" defaultValue={item.name} required />
+                        <Input name="category" defaultValue={item.category} required />
+                        <Select name="priority" defaultValue={item.priority}>
+                          <option value="CRITICAL">Critical</option>
+                          <option value="HIGH">High</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="LOW">Low</option>
+                        </Select>
+                        <Select name="status" defaultValue={item.status}>
+                          <option value="PLANNED">Planned</option>
+                          <option value="RESEARCHING">Researching</option>
+                          <option value="READY_TO_BUY">Ready to buy</option>
+                          <option value="PURCHASED">Purchased</option>
+                        </Select>
+                        <Input name="estimatedCost" type="number" step="0.01" defaultValue={Number(item.estimatedCost ?? 0)} />
+                        <Input name="vendor" defaultValue={item.vendor ?? ""} />
+                        <Input name="purchaseUrl" defaultValue={item.purchaseUrl ?? ""} className="lg:col-span-2" />
+                        <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                        <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                      </form>
+                    </EditDialog>
+                    <ArchiveForm id={item.id} kind="wishlist" label={item.status === "PURCHASED" ? "Purchased" : "Mark purchased"} />
+                  </div>
                 </div>
               </div>
             ))}

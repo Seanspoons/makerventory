@@ -1,6 +1,7 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -60,7 +61,28 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
                   </p>
                   {item.installedOnPrinter ? <p className="mt-2 text-sm text-slate-500">Installed on {item.installedOnPrinter.name}</p> : null}
                 </div>
-                <ArchiveForm id={item.id} kind="build-plate" label="Retire" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update plate sizing, surface, and wear state.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="build-plate" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Input name="surfaceType" defaultValue={item.surfaceType} required />
+                      <Input name="sizeLabel" defaultValue={item.sizeLabel} required />
+                      <Input name="sizeMm" type="number" defaultValue={item.sizeMm} required />
+                      <Select name="status" defaultValue={item.status}>
+                        <option value="AVAILABLE">Available</option>
+                        <option value="IN_USE">In use</option>
+                        <option value="WORN">Worn</option>
+                        <option value="RETIRED">Retired</option>
+                      </Select>
+                      <div />
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="build-plate" label="Retire" />
+                </div>
               </div>
             </div>
           ))}

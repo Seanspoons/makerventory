@@ -1,6 +1,7 @@
-import { createInventoryItem } from "@/app/actions";
+import { createInventoryItem, updateInventoryItem } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
+import { EditDialog } from "@/components/inventory/edit-dialog";
 import { FilterBar } from "@/components/inventory/filter-bar";
 import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
@@ -47,7 +48,21 @@ export default async function ToolsPartsPage(props: { searchParams?: SearchParam
                   <p className="mt-2 text-sm text-slate-500">{item.category} · Qty {item.quantity}</p>
                   <p className="mt-2 text-sm text-slate-600">{item.storageLocation ?? "No storage location"}</p>
                 </div>
-                <ArchiveForm id={item.id} kind="tool" label="Delete" />
+                <div className="flex items-center gap-2">
+                  <EditDialog title={`Edit ${item.name}`} description="Update category, quantity, and storage location for this support item.">
+                    <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                      <input type="hidden" name="kind" value="tool" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <Input name="name" defaultValue={item.name} required />
+                      <Input name="category" defaultValue={item.category} required />
+                      <Input name="quantity" type="number" defaultValue={item.quantity} required />
+                      <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
+                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                    </form>
+                  </EditDialog>
+                  <ArchiveForm id={item.id} kind="tool" label="Delete" />
+                </div>
               </div>
             </div>
           ))}
