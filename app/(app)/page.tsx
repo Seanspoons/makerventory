@@ -23,13 +23,15 @@ export default async function HomePage() {
             action={
               <div className="flex flex-wrap gap-3">
                 <Button asChild>
-                  <Link href="/filament">
+                  <Link href="/filament" className="text-white">
                     Review filament risk
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
                 <Button asChild variant="secondary">
-                  <Link href="/maintenance">Log maintenance</Link>
+                  <Link href="/maintenance" className="text-slate-700">
+                    Log maintenance
+                  </Link>
                 </Button>
               </div>
             }

@@ -60,10 +60,12 @@ export function AppSidebar() {
                     <Icon
                       className={cn(
                         "h-4 w-4",
-                        active ? "text-slate-950" : "text-slate-400",
+                        active ? "!text-slate-950" : "text-slate-400",
                       )}
                     />
-                    <span>{item.label}</span>
+                    <span className={cn(active ? "!text-slate-950" : "text-inherit")}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
