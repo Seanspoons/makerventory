@@ -76,12 +76,20 @@ docker compose up --build
 
 What happens on startup:
 
+- the app ensures container dependencies match `package-lock.json`
 - PostgreSQL starts in a dedicated container
 - the app waits for the database to become reachable
 - Prisma Client is generated
 - `prisma db push` applies the schema
 - the seed runs only if the database is empty
 - Next.js starts in development mode with file watching enabled
+
+Live reload behavior:
+
+- leave `docker compose up` running
+- edit files locally in this repo
+- the app container sees the bind-mounted changes immediately
+- Next.js dev mode reloads the browser as you work
 
 Useful Docker commands:
 

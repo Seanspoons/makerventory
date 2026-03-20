@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+echo "Ensuring dependencies are installed..."
+node ./scripts/ensure-node-modules.mjs
+
 echo "Waiting for PostgreSQL..."
 node ./scripts/wait-for-postgres.mjs
 
