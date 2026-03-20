@@ -10,7 +10,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="rounded-[30px] border border-slate-200/80 bg-slate-950 px-5 py-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+    <aside className="sidebar-scroll h-full overflow-y-auto rounded-[30px] border border-slate-200/80 bg-slate-950 px-5 py-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
       <div className="flex items-center gap-3 border-b border-white/10 pb-5">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
           <Box className="h-5 w-5" />
@@ -51,13 +51,18 @@ export function AppSidebar() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition",
+                      "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-colors",
                       active
-                        ? "bg-white text-slate-950"
+                        ? "bg-slate-50 font-semibold text-slate-950 ring-1 ring-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                         : "text-slate-300 hover:bg-white/8 hover:text-white",
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon
+                      className={cn(
+                        "h-4 w-4",
+                        active ? "text-slate-950" : "text-slate-400",
+                      )}
+                    />
                     <span>{item.label}</span>
                   </Link>
                 );

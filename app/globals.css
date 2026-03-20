@@ -52,3 +52,7 @@ textarea {
     linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
 }
+
+.sidebar-scroll {
+  scrollbar-gutter: stable;
+}
