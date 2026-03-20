@@ -22,14 +22,18 @@ export default async function HomePage() {
             description="Makerventory keeps machines, material flow, maintenance, safety, and purchase planning visible in one operational dashboard."
             action={
               <div className="flex flex-wrap gap-3">
-                <Button asChild>
-                  <Link href="/filament" className="text-white">
+                <Button asChild className="!text-white [&_svg]:!text-white">
+                  <Link href="/filament">
                     Review filament risk
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild variant="secondary">
-                  <Link href="/maintenance" className="text-slate-700">
+                <Button
+                  asChild
+                  variant="secondary"
+                  className="!text-slate-700 [&_svg]:!text-slate-700"
+                >
+                  <Link href="/maintenance">
                     Log maintenance
                   </Link>
                 </Button>
