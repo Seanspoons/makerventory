@@ -7,8 +7,12 @@ export const metadata: Metadata = {
   title: "Makerventory",
   description: "3D Printing Inventory and Operations Manager",
   icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png", sizes: "512x512" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon.svg",
     apple: "/apple-icon.png",
   },
 };

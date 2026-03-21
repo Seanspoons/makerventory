@@ -64,7 +64,7 @@ function numberValue(formData: FormData, key: string, fallback = 0) {
 
 function revalidateInventory() {
   [
-    "/",
+    "/dashboard",
     "/imports",
     "/audit",
     "/printers",
@@ -874,7 +874,7 @@ export async function updateWorkspaceProfile(formData: FormData) {
     message: "The workspace name was saved.",
   });
   revalidatePath("/account");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 export async function changeAccountPassword(formData: FormData) {
@@ -1279,7 +1279,7 @@ export async function updateFilamentState(formData: FormData) {
     message: "The spool status was updated.",
   });
   revalidatePath("/filament");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 export async function createMaintenanceLog(formData: FormData) {
@@ -1326,7 +1326,7 @@ export async function createMaintenanceLog(formData: FormData) {
     message: "The maintenance event was recorded successfully.",
   });
   revalidatePath("/maintenance");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 export async function stageImportJob(formData: FormData) {

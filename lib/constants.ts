@@ -4,7 +4,7 @@ import { CircleUserRound, DatabaseZap, Layers3, Package, ScrollText, ShieldCheck
 export const navigation = [
   {
     title: "Overview",
-    items: [{ label: "Dashboard", href: "/" as Route, icon: Layers3 }],
+    items: [{ label: "Dashboard", href: "/dashboard" as Route, icon: Layers3 }],
   },
   {
     title: "Operations",

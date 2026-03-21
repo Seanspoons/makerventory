@@ -15,7 +15,7 @@ export default function SignInPage() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
   async function handleSubmit(formData: FormData) {
     const email = String(formData.get("email") || "").trim().toLowerCase();

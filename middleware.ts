@@ -9,6 +9,20 @@ export default withAuth({
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/password-reset|api/import-templates|sign-in|sign-up|forgot-password|reset-password|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    "/dashboard/:path*",
+    "/account/:path*",
+    "/audit/:path*",
+    "/build-plates/:path*",
+    "/consumables/:path*",
+    "/filament/:path*",
+    "/hotends/:path*",
+    "/imports/:path*",
+    "/maintenance/:path*",
+    "/material-systems/:path*",
+    "/printers/:path*",
+    "/safety/:path*",
+    "/smart-plugs/:path*",
+    "/tools-parts/:path*",
+    "/wishlist/:path*",
   ],
 };
