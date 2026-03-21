@@ -55,15 +55,27 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
       return `${a.materialType}-${a.brand}-${a.color}`.localeCompare(`${b.materialType}-${b.brand}-${b.color}`);
     });
 
+  const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, item) => {
+    const key = item.materialType;
+    acc[key] ??= [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
   const materialOptions = Array.from(new Set(filament.map((item) => item.materialType)));
   const brandOptions = Array.from(new Set(filament.map((item) => item.brand)));
+  const lowStockCount = filtered.filter((item) => item.status === "LOW" || item.nearlyEmpty).length;
+  const dryingCount = filtered.filter(
+    (item) => item.dryingRequired || item.filamentRecommendation?.dryerSuggested,
+  ).length;
+  const abrasiveCount = filtered.filter((item) => item.abrasive).length;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Materials"
+        eyebrow="Inventory"
         title="Filament"
-        description="Track stock, drying risk, abrasive handling, and spool readiness with a workflow tuned for real print planning."
+        description="See stock state first, handling risks second, and deeper technical detail only when it is relevant."
       />
 
       <QuickAddShell
@@ -99,6 +111,27 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
           </div>
         </form>
       </QuickAddShell>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Visible spools</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {filtered.reduce((sum, item) => sum + item.quantity, 0)}
+          </p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Low stock now</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{lowStockCount}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Needs drying review</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{dryingCount}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Abrasive materials</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{abrasiveCount}</p>
+        </div>
+      </div>
 
       <form className="space-y-5">
         <FilterBar>
@@ -159,184 +192,207 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
 
       <SectionCard
         title="Filament inventory"
-        description={`${filtered.length} filament entries shown. Abrasive and hygroscopic guidance is surfaced directly in the table.`}
+        description="Grouped by material so the current stock picture is easier to scan before you open technical detail."
       >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">Spool</th>
-                <th className="px-4 py-3 font-medium">Stock</th>
-                <th className="px-4 py-3 font-medium">Handling</th>
-                <th className="px-4 py-3 font-medium">Recommendation</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {filtered.map((item) => (
-                <tr key={item.id} className="align-top">
-                  <td className="px-4 py-4">
-                    <p className="font-medium text-slate-950">
-                      {item.brand} {item.color} {item.materialType}
-                    </p>
-                    <p className="mt-1 text-slate-500">
-                      {item.subtype ?? item.finish ?? "Standard"} · {item.storageLocation ?? "No storage location"}
-                    </p>
-                    {item.notes ? <p className="mt-2 text-slate-500">{item.notes}</p> : null}
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    <p>{item.quantity} spool(s)</p>
-                    <p className="mt-1">{formatRelativeStock(item.estimatedRemainingGrams)}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <StatusBadge value={item.status} />
-                      {item.opened ? <StatusBadge value="IN_USE" /> : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    <p>{item.abrasive ? "Abrasive" : "Standard wear"}</p>
-                    <p className="mt-1">{item.dryingRequired ? "Dry before long prints" : "Normal dry storage"}</p>
-                    <p className="mt-1">{item.hygroscopicLevel ?? "Unspecified"} hygroscopic level</p>
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    <p>{item.filamentRecommendation?.recommendedNozzle ?? "Standard 0.4mm"}</p>
-                    <p className="mt-1">
-                      {item.filamentRecommendation?.hardenedNozzleNeeded ? "Hardened nozzle recommended" : "Standard nozzle acceptable"}
-                    </p>
-                    <p className="mt-1">
-                      {item.filamentRecommendation?.dryerSuggested ? "Dryer / desiccant attention suggested" : "No extra drying workflow"}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col items-end gap-2">
-                      <EditDialog
-                        title={`Edit ${item.brand} ${item.color} ${item.materialType}`}
-                        description="Update stock, handling, and recommendation fields for this filament record."
-                      >
-                        <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
-                          <input type="hidden" name="kind" value="filament" />
-                          <input type="hidden" name="id" value={item.id} />
-                          <Input name="brand" defaultValue={item.brand} required />
-                          <Input name="materialType" defaultValue={item.materialType} required />
-                          <Input name="subtype" defaultValue={item.subtype ?? ""} />
-                          <Input name="finish" defaultValue={item.finish ?? ""} />
-                          <Input name="color" defaultValue={item.color} required />
-                          <Input name="quantity" type="number" defaultValue={item.quantity} required />
-                          <Input
-                            name="estimatedRemainingGrams"
-                            type="number"
-                            defaultValue={item.estimatedRemainingGrams ?? 1000}
-                          />
-                          <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
-                          <Select name="status" defaultValue={item.status}>
-                            <option value="HEALTHY">Healthy</option>
-                            <option value="LOW">Low</option>
-                            <option value="OUT">Out</option>
-                            <option value="ARCHIVED">Archived</option>
-                          </Select>
-                          <Select
-                            name="hygroscopicLevel"
-                            defaultValue={item.hygroscopicLevel ?? ""}
+        <div className="space-y-6">
+          {Object.keys(grouped).length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-500">
+              No filament matches the current filters.
+            </div>
+          ) : null}
+
+          {Object.entries(grouped).map(([materialType, items]) => (
+            <div key={materialType} className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Material group
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+                    {materialType}
+                  </h2>
+                </div>
+                <p className="text-sm text-slate-500">
+                  {items.reduce((sum, item) => sum + item.quantity, 0)} spool(s) in view
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                {items.map((item) => {
+                  const needsDrying =
+                    item.dryingRequired || item.filamentRecommendation?.dryerSuggested;
+                  const lowNow = item.status === "LOW" || item.nearlyEmpty;
+
+                  return (
+                    <div key={item.id} className="rounded-[24px] border border-slate-200 bg-white p-4">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="break-words text-lg font-semibold tracking-tight text-slate-950">
+                              {item.brand} {item.color}
+                            </p>
+                            <StatusBadge value={item.status} />
+                            {item.opened ? <StatusBadge value="IN_USE" /> : null}
+                            {lowNow ? <StatusBadge value="LOW" /> : null}
+                          </div>
+                          <p className="mt-2 break-words text-sm text-slate-500">
+                            {item.subtype ?? item.finish ?? "Standard"} · {item.storageLocation ?? "No storage location"}
+                          </p>
+                          <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 xl:grid-cols-4">
+                            <p>{item.quantity} spool(s)</p>
+                            <p>{formatRelativeStock(item.estimatedRemainingGrams)}</p>
+                            <p>{needsDrying ? "Needs drying review" : "Normal dry storage"}</p>
+                            <p>{item.abrasive ? "Abrasive handling" : "Standard wear"}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 lg:max-w-[320px] lg:justify-end">
+                          <form action={updateFilamentState}>
+                            <input type="hidden" name="id" value={item.id} />
+                            <input type="hidden" name="opened" value={item.opened ? "false" : "true"} />
+                            <input type="hidden" name="nearlyEmpty" value={item.nearlyEmpty ? String(item.nearlyEmpty) : "false"} />
+                            <input type="hidden" name="estimatedRemainingGrams" value={item.estimatedRemainingGrams ?? 1000} />
+                            <SubmitButton variant="secondary" size="sm">
+                              {item.opened ? "Mark sealed" : "Mark opened"}
+                            </SubmitButton>
+                          </form>
+                          <form action={updateFilamentState}>
+                            <input type="hidden" name="id" value={item.id} />
+                            <input type="hidden" name="opened" value={String(item.opened)} />
+                            <input type="hidden" name="nearlyEmpty" value={item.nearlyEmpty ? "false" : "true"} />
+                            <input
+                              type="hidden"
+                              name="estimatedRemainingGrams"
+                              value={Math.max(
+                                0,
+                                item.nearlyEmpty
+                                  ? (item.estimatedRemainingGrams ?? 500) + 200
+                                  : (item.estimatedRemainingGrams ?? 500) - 200,
+                              )}
+                            />
+                            <SubmitButton variant="secondary" size="sm">
+                              {item.nearlyEmpty ? "Clear nearly empty" : "Mark nearly empty"}
+                            </SubmitButton>
+                          </form>
+                          <EditDialog
+                            title={`Edit ${item.brand} ${item.color} ${item.materialType}`}
+                            description="Update stock, handling, and recommendation fields for this filament record."
                           >
-                            <option value="">Unspecified</option>
-                            <option value="LOW">Low</option>
-                            <option value="MEDIUM">Medium</option>
-                            <option value="HIGH">High</option>
-                          </Select>
-                          <Input
-                            name="recommendedNozzle"
-                            defaultValue={
-                              item.filamentRecommendation?.recommendedNozzle ?? ""
-                            }
-                          />
-                          <div className="flex flex-wrap gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="opened"
-                                defaultChecked={item.opened}
+                            <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                              <input type="hidden" name="kind" value="filament" />
+                              <input type="hidden" name="id" value={item.id} />
+                              <Input name="brand" defaultValue={item.brand} required />
+                              <Input name="materialType" defaultValue={item.materialType} required />
+                              <Input name="subtype" defaultValue={item.subtype ?? ""} />
+                              <Input name="finish" defaultValue={item.finish ?? ""} />
+                              <Input name="color" defaultValue={item.color} required />
+                              <Input name="quantity" type="number" defaultValue={item.quantity} required />
+                              <Input
+                                name="estimatedRemainingGrams"
+                                type="number"
+                                defaultValue={item.estimatedRemainingGrams ?? 1000}
                               />
-                              Opened
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="nearlyEmpty"
-                                defaultChecked={item.nearlyEmpty}
+                              <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
+                              <Select name="status" defaultValue={item.status}>
+                                <option value="HEALTHY">Healthy</option>
+                                <option value="LOW">Low</option>
+                                <option value="OUT">Out</option>
+                                <option value="ARCHIVED">Archived</option>
+                              </Select>
+                              <Select name="hygroscopicLevel" defaultValue={item.hygroscopicLevel ?? ""}>
+                                <option value="">Unspecified</option>
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HIGH">High</option>
+                              </Select>
+                              <Input
+                                name="recommendedNozzle"
+                                defaultValue={item.filamentRecommendation?.recommendedNozzle ?? ""}
                               />
-                              Nearly empty
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="abrasive"
-                                defaultChecked={Boolean(item.abrasive)}
+                              <div className="flex flex-wrap gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input type="checkbox" name="opened" defaultChecked={item.opened} />
+                                  Opened
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input type="checkbox" name="nearlyEmpty" defaultChecked={item.nearlyEmpty} />
+                                  Nearly empty
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input type="checkbox" name="abrasive" defaultChecked={Boolean(item.abrasive)} />
+                                  Abrasive
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input type="checkbox" name="dryingRequired" defaultChecked={Boolean(item.dryingRequired)} />
+                                  Drying required
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    name="dryerSuggested"
+                                    defaultChecked={Boolean(item.filamentRecommendation?.dryerSuggested)}
+                                  />
+                                  Dryer suggested
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    name="hardenedNozzleNeeded"
+                                    defaultChecked={Boolean(item.filamentRecommendation?.hardenedNozzleNeeded)}
+                                  />
+                                  Hardened nozzle needed
+                                </label>
+                              </div>
+                              <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                              <Textarea
+                                name="recommendationNotes"
+                                defaultValue={item.filamentRecommendation?.notes ?? ""}
+                                className="lg:col-span-2"
                               />
-                              Abrasive
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="dryingRequired"
-                                defaultChecked={Boolean(item.dryingRequired)}
-                              />
-                              Drying required
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="dryerSuggested"
-                                defaultChecked={Boolean(
-                                  item.filamentRecommendation?.dryerSuggested,
-                                )}
-                              />
-                              Dryer suggested
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                              <input
-                                type="checkbox"
-                                name="hardenedNozzleNeeded"
-                                defaultChecked={Boolean(
-                                  item.filamentRecommendation?.hardenedNozzleNeeded,
-                                )}
-                              />
-                              Hardened nozzle needed
-                            </label>
+                              <div className="lg:col-span-2">
+                                <SubmitButton>Save changes</SubmitButton>
+                              </div>
+                            </form>
+                          </EditDialog>
+                          <ArchiveForm id={item.id} kind="filament" />
+                        </div>
+                      </div>
+
+                      <details className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50/80">
+                        <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                          Technical detail and recommendations
+                        </summary>
+                        <div className="grid gap-3 border-t border-slate-100 p-4 md:grid-cols-2">
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <p className="text-sm text-slate-500">Recommendation</p>
+                            <p className="mt-2 font-medium text-slate-950">
+                              {item.filamentRecommendation?.recommendedNozzle ?? "Standard 0.4mm"}
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {item.filamentRecommendation?.hardenedNozzleNeeded
+                                ? "Hardened nozzle recommended for wear resistance."
+                                : "Standard nozzle is acceptable for this stock."}
+                            </p>
                           </div>
-                          <Textarea
-                            name="notes"
-                            defaultValue={item.notes ?? ""}
-                            className="lg:col-span-2"
-                          />
-                          <Textarea
-                            name="recommendationNotes"
-                            defaultValue={item.filamentRecommendation?.notes ?? ""}
-                            className="lg:col-span-2"
-                          />
-                          <div className="lg:col-span-2">
-                            <SubmitButton>Save changes</SubmitButton>
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <p className="text-sm text-slate-500">Handling notes</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {item.filamentRecommendation?.notes ??
+                                item.notes ??
+                                "No additional handling notes recorded."}
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              Hygroscopic level: {item.hygroscopicLevel ?? "Unspecified"}
+                            </p>
                           </div>
-                        </form>
-                      </EditDialog>
-                      <form action={updateFilamentState} className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <input type="hidden" name="id" value={item.id} />
-                        <input type="hidden" name="opened" value={item.opened ? "false" : "true"} />
-                        <input type="hidden" name="nearlyEmpty" value={item.nearlyEmpty ? "false" : "true"} />
-                        <input
-                          type="hidden"
-                          name="estimatedRemainingGrams"
-                          value={Math.max(0, item.nearlyEmpty ? (item.estimatedRemainingGrams ?? 500) + 200 : (item.estimatedRemainingGrams ?? 500) - 200)}
-                        />
-                        <SubmitButton variant="ghost" size="sm">
-                          {item.opened ? "Mark sealed" : "Mark opened"}
-                        </SubmitButton>
-                      </form>
-                      <ArchiveForm id={item.id} kind="filament" />
+                        </div>
+                      </details>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </SectionCard>
     </div>

@@ -8,17 +8,19 @@ import { QuickAddShell } from "@/components/inventory/quick-add-shell";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getPrinters } from "@/lib/data";
+import { cn } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function PrintersPage(props: { searchParams?: SearchParams }) {
   const searchParams = (await props.searchParams) ?? {};
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
-  const status = typeof searchParams.status === "string" ? searchParams.status : "ALL";
+  const status = typeof searchParams.status === "string" ? searchParams.status : "ACTIVE";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
   const printers = await getPrinters();
 
@@ -36,18 +38,24 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
   });
 
   const detail = filtered.find((printer) => printer.id === selected) ?? filtered[0] ?? null;
+  const setupGaps = filtered.filter(
+    (printer) =>
+      !printer.installedHotendId ||
+      !printer.installedPlateId ||
+      printer.materialSystems.length === 0,
+  ).length;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Fleet"
+        eyebrow="Inventory"
         title="Printers"
-        description="Track machine state, installed components, power assignment, and recent maintenance in one fleet view."
+        description="Scan fleet health first, then open a printer when you need full setup and maintenance detail."
       />
 
       <QuickAddShell
         title="Add printer"
-        description="Create a new printer record with the minimum data needed to bring it into the operational view."
+        description="Create a new printer record with just enough information to bring it into the fleet view."
       >
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="printer" />
@@ -65,6 +73,23 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
         </form>
       </QuickAddShell>
 
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Printers in view</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{filtered.length}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Setup gaps</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{setupGaps}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Recent maintenance logs</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {filtered.reduce((sum, printer) => sum + printer.maintenanceLogs.length, 0)}
+          </p>
+        </div>
+      </div>
+
       <form className="space-y-5">
         <FilterBar>
           <div className="min-w-0 flex-1 sm:min-w-[260px]">
@@ -74,8 +99,8 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
           <div className="w-full md:w-56">
             <label className="mb-2 block text-sm text-slate-500">Status</label>
             <Select name="status" defaultValue={status}>
+              <option value="ACTIVE">Active first</option>
               <option value="ALL">All statuses</option>
-              <option value="ACTIVE">Active</option>
               <option value="MAINTENANCE">Maintenance</option>
               <option value="OFFLINE">Offline</option>
               <option value="ARCHIVED">Archived</option>
@@ -85,157 +110,175 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
         </FilterBar>
       </form>
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <SectionCard title="Printer inventory" description={`${filtered.length} printer records in view.`}>
-          <div className="overflow-x-auto rounded-[24px] border border-slate-100">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Printer</th>
-                  <th className="px-4 py-3 font-medium">Installed setup</th>
-                  <th className="px-4 py-3 font-medium">Power / AMS</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {filtered.map((printer) => (
-                  <tr key={printer.id} className="align-top">
-                    <td className="px-4 py-4">
-                      <Link
-                        href={`/printers?selected=${printer.id}`}
-                        className="font-medium text-slate-950 hover:text-blue-700"
-                      >
+      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-start">
+        <SectionCard
+          title="Fleet list"
+          description="Each card surfaces just the current state, installed setup, and any obvious setup gaps."
+          className="xl:sticky xl:top-6"
+        >
+          <div className="space-y-3 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:pr-2">
+            {filtered.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+                No printers match the current filters.
+              </div>
+            ) : null}
+
+            {filtered.map((printer) => {
+              const href = `/printers?selected=${printer.id}#printer-detail`;
+              const isSelected = detail?.id === printer.id;
+              const hasGap =
+                !printer.installedHotendId ||
+                !printer.installedPlateId ||
+                printer.materialSystems.length === 0;
+
+              return (
+                <Link
+                  key={printer.id}
+                  href={href as Parameters<typeof Link>[0]["href"]}
+                  className={cn(
+                    "block rounded-[24px] border p-4 transition",
+                    isSelected
+                      ? "border-slate-900 bg-slate-950 text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={cn("break-words font-medium", isSelected ? "text-white" : "text-slate-950")}>
                         {printer.name}
-                      </Link>
-                      <p className="mt-1 text-slate-500">
-                        {printer.brand} {printer.model} · {printer.buildVolumeX} x {printer.buildVolumeY} x {printer.buildVolumeZ}
                       </p>
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">
-                      <p>{printer.installedHotend?.name ?? "No hotend assigned"}</p>
-                      <p className="mt-1">{printer.installedPlate?.name ?? "No plate assigned"}</p>
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">
-                      <p>{printer.smartPlug?.name ?? "No smart plug"}</p>
-                      <p className="mt-1">
-                        {printer.materialSystems.map((system) => system.name).join(", ") || "No linked material system"}
+                      <p className={cn("mt-1 break-words text-sm", isSelected ? "text-white/75" : "text-slate-500")}>
+                        {printer.brand} {printer.model} · {printer.location ?? "No location"}
                       </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <StatusBadge value={printer.status} />
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <EditDialog
-                          title={`Edit ${printer.name}`}
-                          description="Update the core printer record."
-                        >
-                          <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
-                            <input type="hidden" name="kind" value="printer" />
-                            <input type="hidden" name="id" value={printer.id} />
-                            <Input name="name" defaultValue={printer.name} required />
-                            <Input name="brand" defaultValue={printer.brand} required />
-                            <Input name="model" defaultValue={printer.model} required />
-                            <Input name="location" defaultValue={printer.location ?? ""} />
-                            <Select name="status" defaultValue={printer.status}>
-                              <option value="ACTIVE">Active</option>
-                              <option value="MAINTENANCE">Maintenance</option>
-                              <option value="OFFLINE">Offline</option>
-                              <option value="ARCHIVED">Archived</option>
-                            </Select>
-                            <div />
-                            <Input name="buildVolumeX" type="number" defaultValue={printer.buildVolumeX} required />
-                            <Input name="buildVolumeY" type="number" defaultValue={printer.buildVolumeY} required />
-                            <Input name="buildVolumeZ" type="number" defaultValue={printer.buildVolumeZ} required />
-                            <Textarea name="notes" defaultValue={printer.notes ?? ""} className="lg:col-span-2" />
-                            <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
-                          </form>
-                        </EditDialog>
-                        <Link href={`/printers/${printer.slug}`} className="text-sm font-medium text-slate-700 hover:text-slate-950">
-                          Details
-                        </Link>
-                        <ArchiveForm id={printer.id} kind="printer" />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <StatusBadge value={printer.status} />
+                  </div>
+                  <div className={cn("mt-4 grid gap-3 text-sm md:grid-cols-2", isSelected ? "text-white/80" : "text-slate-600")}>
+                    <p className="break-words">Hotend: {printer.installedHotend?.name ?? "Unassigned"}</p>
+                    <p className="break-words">Plate: {printer.installedPlate?.name ?? "Unassigned"}</p>
+                    <p className="break-words md:col-span-2">
+                      Material flow: {printer.materialSystems.map((system) => system.name).join(", ") || "No linked material system"}
+                    </p>
+                  </div>
+                  {hasGap ? (
+                    <p className={cn("mt-3 text-sm font-medium", isSelected ? "text-amber-200" : "text-amber-700")}>
+                      Setup needs attention
+                    </p>
+                  ) : null}
+                </Link>
+              );
+            })}
           </div>
         </SectionCard>
 
-        <SectionCard title="Selected printer" description="Operational context, current setup, and recent service activity.">
-          {detail ? (
-            <div className="space-y-5">
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                    {detail.name}
-                  </h2>
-                  <StatusBadge value={detail.status} />
+        <div id="printer-detail">
+          <SectionCard title={detail ? detail.name : "Selected printer"} description="Open a printer from the fleet list to see full context, maintenance, and next actions.">
+            {detail ? (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3">
+                      <h2 className="break-words text-2xl font-semibold tracking-tight text-slate-950">
+                        {detail.name}
+                      </h2>
+                      <StatusBadge value={detail.status} />
+                    </div>
+                    <p className="mt-2 break-words text-sm text-slate-500">
+                      {detail.brand} {detail.model} · {detail.location ?? "Location not set"} · {detail.buildVolumeX} x {detail.buildVolumeY} x {detail.buildVolumeZ} mm
+                    </p>
+                    {detail.notes ? (
+                      <p className="mt-3 text-sm leading-7 text-slate-600">{detail.notes}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <EditDialog title={`Edit ${detail.name}`} description="Update the core printer record.">
+                      <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
+                        <input type="hidden" name="kind" value="printer" />
+                        <input type="hidden" name="id" value={detail.id} />
+                        <Input name="name" defaultValue={detail.name} required />
+                        <Input name="brand" defaultValue={detail.brand} required />
+                        <Input name="model" defaultValue={detail.model} required />
+                        <Input name="location" defaultValue={detail.location ?? ""} />
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="ACTIVE">Active</option>
+                          <option value="MAINTENANCE">Maintenance</option>
+                          <option value="OFFLINE">Offline</option>
+                          <option value="ARCHIVED">Archived</option>
+                        </Select>
+                        <div />
+                        <Input name="buildVolumeX" type="number" defaultValue={detail.buildVolumeX} required />
+                        <Input name="buildVolumeY" type="number" defaultValue={detail.buildVolumeY} required />
+                        <Input name="buildVolumeZ" type="number" defaultValue={detail.buildVolumeZ} required />
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                        <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
+                      </form>
+                    </EditDialog>
+                    <Button asChild variant="secondary" size="sm">
+                      <Link href={`/printers/${detail.slug}`}>Open detail page</Link>
+                    </Button>
+                    <ArchiveForm id={detail.id} kind="printer" />
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  {detail.location ?? "Location not set"} · {detail.buildVolumeX} x {detail.buildVolumeY} x {detail.buildVolumeZ} mm
-                </p>
-                {detail.notes ? (
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{detail.notes}</p>
-                ) : null}
-              </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Installed hotend</p>
-                  <p className="mt-2 font-medium text-slate-950">{detail.installedHotend?.name ?? "Unassigned"}</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">Installed hotend</p>
+                    <p className="mt-2 font-medium text-slate-950">{detail.installedHotend?.name ?? "Unassigned"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">Installed plate</p>
+                    <p className="mt-2 font-medium text-slate-950">{detail.installedPlate?.name ?? "Unassigned"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">Smart plug</p>
+                    <p className="mt-2 font-medium text-slate-950">{detail.smartPlug?.assignedDeviceLabel ?? "No smart plug assigned"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">Material systems</p>
+                    <p className="mt-2 font-medium text-slate-950">
+                      {detail.materialSystems.map((system) => system.name).join(", ") || "No material systems linked"}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Installed plate</p>
-                  <p className="mt-2 font-medium text-slate-950">{detail.installedPlate?.name ?? "Unassigned"}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Smart plug</p>
-                  <p className="mt-2 font-medium text-slate-950">{detail.smartPlug?.assignedDeviceLabel ?? "No smart plug assigned"}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Material systems</p>
-                  <p className="mt-2 font-medium text-slate-950">
-                    {detail.materialSystems.map((system) => system.name).join(", ") || "No material systems linked"}
-                  </p>
-                </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-950">Recent maintenance</p>
-                  <div className="mt-3 space-y-3 text-sm text-slate-600">
-                    {detail.maintenanceLogs.map((log) => (
-                      <div key={log.id}>
-                        <p>{log.actionPerformed}</p>
-                        <p className="mt-1 text-slate-500">{new Date(log.date).toLocaleDateString()}</p>
+                <details className="rounded-[24px] border border-slate-200 bg-white">
+                  <summary className="cursor-pointer list-none px-4 py-4 font-medium text-slate-950">
+                    Maintenance and compatibility detail
+                  </summary>
+                  <div className="grid gap-4 border-t border-slate-100 p-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-sm font-medium text-slate-950">Recent maintenance</p>
+                      <div className="mt-3 space-y-3 text-sm text-slate-600">
+                        {detail.maintenanceLogs.length > 0 ? (
+                          detail.maintenanceLogs.map((log) => (
+                            <div key={log.id}>
+                              <p>{log.actionPerformed}</p>
+                              <p className="mt-1 text-slate-500">{new Date(log.date).toLocaleDateString()}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p>No maintenance logs yet.</p>
+                        )}
                       </div>
-                    ))}
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-sm font-medium text-slate-950">Compatibility coverage</p>
+                      <div className="mt-3 space-y-3 text-sm text-slate-600">
+                        <p>{detail.installedPlate ? "Installed plate confirmed in compatibility set." : "No installed plate selected."}</p>
+                        <p>{detail.installedHotend ? "Installed hotend confirmed in compatibility set." : "No installed hotend selected."}</p>
+                        <p>{detail.materialSystems.length > 0 ? "Material path available for this printer." : "No linked material path."}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-950">Compatibility coverage</p>
-                  <div className="mt-3 space-y-3 text-sm text-slate-600">
-                    <p>{detail.installedPlate ? "Installed plate confirmed in compatibility set." : "No installed plate selected."}</p>
-                    <p>{detail.installedHotend ? "Installed hotend confirmed in compatibility set." : "No installed hotend selected."}</p>
-                    <p>{detail.materialSystems.length > 0 ? "Material path available for this printer." : "No linked material path."}</p>
-                  </div>
-                </div>
+                </details>
               </div>
-
-              <div className="flex gap-3">
-                <Link href={`/printers/${detail.slug}`} className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
-                  Open detail page
-                </Link>
+            ) : (
+              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+                No printer matches the current filters.
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500">No printer matches the current filters.</p>
-          )}
-        </SectionCard>
+            )}
+          </SectionCard>
+        </div>
       </div>
     </div>
   );

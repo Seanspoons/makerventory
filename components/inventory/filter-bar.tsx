@@ -10,8 +10,8 @@ export function FilterBar({
 }) {
   return (
     <SectionCard
-      title="Filters"
-      description="Search, narrow, and sort this inventory view."
+      title="Narrow this view"
+      description="Start with a few useful defaults, then filter further only when needed."
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:flex-wrap md:items-end">
