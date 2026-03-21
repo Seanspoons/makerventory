@@ -13,14 +13,14 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn("p-5 lg:p-6", className)}>
+    <Card className={cn("min-w-0 p-4 sm:p-5 lg:p-6", className)}>
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-slate-950">
             {title}
           </h2>
           {description ? (
-            <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+            <p className="mt-1 break-words text-sm leading-6 text-slate-600">{description}</p>
           ) : null}
         </div>
       </div>
