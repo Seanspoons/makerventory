@@ -87,6 +87,11 @@ export default function SignInPage() {
               {isPending ? "Signing in..." : "Sign in"}
             </Button>
             <p className="text-center text-sm text-slate-500">
+              <Link href="/forgot-password" className="font-medium text-slate-950 underline-offset-4 hover:underline">
+                Forgot password?
+              </Link>
+            </p>
+            <p className="text-center text-sm text-slate-500">
               Need an account?{" "}
               <Link href="/sign-up" className="font-medium text-slate-950 underline-offset-4 hover:underline">
                 Create one

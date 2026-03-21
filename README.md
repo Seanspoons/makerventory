@@ -59,6 +59,11 @@ npm run dev
 
 5. Open `http://localhost:3000`, create an account, and enter your own inventory data.
 
+Password reset in local development:
+
+- set `ALLOW_INSECURE_DEV_RESET_LINKS=true` only in local/dev environments if you want Makerventory to surface a reset link directly in the UI flash message
+- keep that value `false` in any shared or production environment
+
 ## Docker Quick Start
 
 1. Start the full local stack:
@@ -78,6 +83,7 @@ What happens on startup:
 - committed migrations are applied
 - if Docker detects an older local dev volume created before migration history existed, it resets the local schema once and reapplies migrations
 - no inventory seed is applied automatically
+- local Docker enables insecure password reset links for testing unless you remove `ALLOW_INSECURE_DEV_RESET_LINKS=true`
 - Next.js starts in development mode with file watching enabled
 
 Live reload behavior:

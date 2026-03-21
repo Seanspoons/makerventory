@@ -28,6 +28,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/makerventory
       NEXTAUTH_URL: http://localhost:3001
       NEXTAUTH_SECRET: change-me-local-dev-secret
+      ALLOW_INSECURE_DEV_RESET_LINKS: "true"
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
       PRISMA_DEV_RESET_ON_P3005: "true"

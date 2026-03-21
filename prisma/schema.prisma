@@ -141,6 +141,7 @@ model User {
   image             String?
   passwordHash      String?
   isActive          Boolean           @default(true)
+  sessionVersion    Int               @default(0)
   activeWorkspaceId String?
   activeWorkspace   Workspace?        @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
   memberships       WorkspaceMember[]
@@ -148,6 +149,7 @@ model User {
   sessions          Session[]
   importJobs        ImportJob[]
   auditEvents       AuditEvent[]
+  passwordResetTokens PasswordResetToken[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -286,6 +288,31 @@ model AuditEvent {
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, actionType])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model RateLimitBucket {
+  id         String   @id @default(cuid())
+  action     String
+  identifier String
+  bucketStart DateTime
+  count      Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([action, identifier, bucketStart])
+  @@index([action, identifier])
 }
 
 model Printer {

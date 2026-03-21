@@ -1,8 +1,14 @@
 import { redirect } from "next/navigation";
-import { changeAccountPassword, updateAccountProfile, updateWorkspaceProfile } from "@/app/actions";
+import {
+  changeAccountPassword,
+  revokeAllSessions,
+  updateAccountProfile,
+  updateWorkspaceProfile,
+} from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
+import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 import { Input } from "@/components/ui/input";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -121,6 +127,31 @@ export default async function AccountPage() {
             <SubmitButton>Change password</SubmitButton>
           </div>
         </form>
+      </SectionCard>
+
+      <SectionCard
+        title="Sessions"
+        description="Makerventory uses JWT-backed sessions. Revoke all sessions if you changed your password or want every device to sign in again."
+      >
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm leading-6 text-slate-600">
+            <p className="font-medium text-slate-950">Current access</p>
+            <p className="mt-1">Role: {session.user.workspaceRole}</p>
+            <p>Workspace: {workspace?.name ?? "Workspace"}</p>
+          </div>
+          <ConfirmActionForm
+            action={revokeAllSessions}
+            title="Revoke all sessions"
+            description="This invalidates every active session for your account, including this device. You will need to sign in again."
+            confirmLabel="Revoke sessions"
+            triggerLabel="Sign out all sessions"
+            triggerVariant="secondary"
+          >
+            <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+              Use this after a password change or if you suspect another device still has access.
+            </div>
+          </ConfirmActionForm>
+        </div>
       </SectionCard>
     </div>
   );

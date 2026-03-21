@@ -22,6 +22,21 @@ import {
   stageImportRecords,
 } from "@/lib/imports";
 import { prisma } from "@/lib/prisma";
+import {
+  assertRateLimit,
+  createPasswordResetToken,
+  getClientIdentifier,
+  hashToken,
+  RateLimitError,
+} from "@/lib/security";
+import {
+  changePasswordSchema,
+  requestPasswordResetSchema,
+  resetPasswordSchema,
+  signUpSchema,
+  updateProfileSchema,
+  updateWorkspaceSchema,
+} from "@/lib/validation";
 import { slugify } from "@/lib/utils";
 
 function requiredString(formData: FormData, key: string) {
@@ -390,91 +405,107 @@ export async function createInventoryItem(formData: FormData) {
 }
 
 export async function signUpUser(formData: FormData) {
-  const name = requiredString(formData, "name");
-  const workspaceName = requiredString(formData, "workspaceName");
-  const email = emailValue(formData, "email");
-  const password = requiredString(formData, "password");
-  const confirmPassword = requiredString(formData, "confirmPassword");
-
-  if (password.length < 12) {
-    await setFlashMessage({
-      type: "error",
-      title: "Password too short",
-      message: "Use at least 12 characters for your account password.",
+  try {
+    const parsed = signUpSchema.safeParse({
+      name: formData.get("name"),
+      workspaceName: formData.get("workspaceName"),
+      email: formData.get("email"),
+      password: formData.get("password"),
+      confirmPassword: formData.get("confirmPassword"),
     });
-    redirect("/sign-up");
+
+    if (!parsed.success) {
+      await setFlashMessage({
+        type: "error",
+        title: "Sign-up details need review",
+        message: parsed.error.issues[0]?.message ?? "Check the sign-up form and try again.",
+      });
+      redirect("/sign-up");
+    }
+
+    const { name, workspaceName, email, password } = parsed.data;
+    const clientIp = await getClientIdentifier();
+    await assertRateLimit({
+      action: "auth:sign-up",
+      identifier: `${clientIp}:${email}`,
+      limit: 5,
+      windowMinutes: 30,
+    });
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      await setFlashMessage({
+        type: "error",
+        title: "Account already exists",
+        message: "Use a different email or sign in to your existing account.",
+      });
+      redirect("/sign-up");
+    }
+
+    const passwordHash = await hashPassword(password);
+    const workspaceSlug = await uniqueWorkspaceSlug(workspaceName);
+
+    await prisma.$transaction(async (tx) => {
+      const workspace = await tx.workspace.create({
+        data: {
+          name: workspaceName,
+          slug: workspaceSlug,
+          description: `${workspaceName} workspace`,
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          name,
+          passwordHash,
+          activeWorkspaceId: workspace.id,
+        },
+      });
+
+      await tx.workspaceMember.create({
+        data: {
+          workspaceId: workspace.id,
+          userId: user.id,
+          role: "OWNER",
+        },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          workspaceId: workspace.id,
+          actorUserId: user.id,
+          actionType: "CREATE",
+          entityType: "workspace",
+          entityId: workspace.id,
+          entityLabel: workspace.name,
+          summary: "Created workspace during signup.",
+        },
+      });
+    });
+
+    await setFlashMessage({
+      type: "success",
+      title: "Account created",
+      message: "Sign in with your new credentials to start adding your inventory.",
+    });
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      await setFlashMessage({
+        type: "error",
+        title: "Too many sign-up attempts",
+        message: error.message,
+      });
+      redirect("/sign-up");
+    }
+
+    throw error;
   }
 
-  if (password !== confirmPassword) {
-    await setFlashMessage({
-      type: "error",
-      title: "Passwords do not match",
-      message: "Re-enter the password confirmation and try again.",
-    });
-    redirect("/sign-up");
-  }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-
-  if (existingUser) {
-    await setFlashMessage({
-      type: "error",
-      title: "Account already exists",
-      message: "Use a different email or sign in to your existing account.",
-    });
-    redirect("/sign-up");
-  }
-
-  const passwordHash = await hashPassword(password);
-  const workspaceSlug = await uniqueWorkspaceSlug(workspaceName);
-
-  await prisma.$transaction(async (tx) => {
-    const workspace = await tx.workspace.create({
-      data: {
-        name: workspaceName,
-        slug: workspaceSlug,
-        description: `${workspaceName} workspace`,
-      },
-    });
-
-    const user = await tx.user.create({
-      data: {
-        email,
-        name,
-        passwordHash,
-        activeWorkspaceId: workspace.id,
-      },
-    });
-
-    await tx.workspaceMember.create({
-      data: {
-        workspaceId: workspace.id,
-        userId: user.id,
-        role: "OWNER",
-      },
-    });
-
-    await tx.auditEvent.create({
-      data: {
-        workspaceId: workspace.id,
-        actorUserId: user.id,
-        actionType: "CREATE",
-        entityType: "workspace",
-        entityId: workspace.id,
-        entityLabel: workspace.name,
-        summary: "Created workspace during signup.",
-      },
-    });
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Account created",
-    message: "Sign in with your new credentials to start adding your inventory.",
-  });
   redirect("/sign-in");
 }
 
@@ -725,8 +756,26 @@ export async function updateInventoryItem(formData: FormData) {
 
 export async function updateAccountProfile(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
-  const name = requiredString(formData, "name");
-  const email = emailValue(formData, "email");
+  const parsed = updateProfileSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+  });
+
+  if (!parsed.success) {
+    await setFlashMessage({
+      type: "error",
+      title: "Profile update failed",
+      message: parsed.error.issues[0]?.message ?? "Check the form and try again.",
+    });
+    redirect("/account");
+  }
+
+  const { name, email } = parsed.data;
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
 
   const existingUser = await prisma.user.findFirst({
     where: {
@@ -761,6 +810,12 @@ export async function updateAccountProfile(formData: FormData) {
     entityId: userId,
     entityLabel: name,
     summary: "Updated account profile details.",
+    metadata: {
+      previousName: currentUser?.name ?? null,
+      previousEmail: currentUser?.email ?? null,
+      nextName: name,
+      nextEmail: email,
+    },
   });
 
   await setFlashMessage({
@@ -773,7 +828,24 @@ export async function updateAccountProfile(formData: FormData) {
 
 export async function updateWorkspaceProfile(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
-  const workspaceName = requiredString(formData, "workspaceName");
+  const parsed = updateWorkspaceSchema.safeParse({
+    workspaceName: formData.get("workspaceName"),
+  });
+
+  if (!parsed.success) {
+    await setFlashMessage({
+      type: "error",
+      title: "Workspace update failed",
+      message: parsed.error.issues[0]?.message ?? "Check the workspace form and try again.",
+    });
+    redirect("/account");
+  }
+
+  const { workspaceName } = parsed.data;
+  const currentWorkspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { name: true },
+  });
 
   await prisma.workspace.update({
     where: { id: workspaceId },
@@ -790,6 +862,10 @@ export async function updateWorkspaceProfile(formData: FormData) {
     entityId: workspaceId,
     entityLabel: workspaceName,
     summary: "Updated workspace settings.",
+    metadata: {
+      previousName: currentWorkspace?.name ?? null,
+      nextName: workspaceName,
+    },
   });
 
   await setFlashMessage({
@@ -802,47 +878,268 @@ export async function updateWorkspaceProfile(formData: FormData) {
 }
 
 export async function changeAccountPassword(formData: FormData) {
-  const { userId, workspaceId } = await getWorkspaceContext();
-  const currentPassword = requiredString(formData, "currentPassword");
-  const nextPassword = requiredString(formData, "nextPassword");
-  const confirmPassword = requiredString(formData, "confirmPassword");
-
-  if (nextPassword.length < 12) {
-    await setFlashMessage({
-      type: "error",
-      title: "Password too short",
-      message: "Use at least 12 characters for the new password.",
+  try {
+    const { userId, workspaceId } = await getWorkspaceContext();
+    const parsed = changePasswordSchema.safeParse({
+      currentPassword: formData.get("currentPassword"),
+      nextPassword: formData.get("nextPassword"),
+      confirmPassword: formData.get("confirmPassword"),
     });
-    redirect("/account");
+
+    if (!parsed.success) {
+      await setFlashMessage({
+        type: "error",
+        title: "Password update failed",
+        message: parsed.error.issues[0]?.message ?? "Check the password fields and try again.",
+      });
+      redirect("/account");
+    }
+
+    const { currentPassword, nextPassword } = parsed.data;
+
+    const clientIp = await getClientIdentifier();
+    await assertRateLimit({
+      action: "auth:change-password",
+      identifier: `${clientIp}:${userId}`,
+      limit: 8,
+      windowMinutes: 30,
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true, name: true },
+    });
+
+    if (!user?.passwordHash || !(await verifyPassword(currentPassword, user.passwordHash))) {
+      await setFlashMessage({
+        type: "error",
+        title: "Current password is incorrect",
+        message: "Enter your existing password to make this change.",
+      });
+      redirect("/account");
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await hashPassword(nextPassword),
+        sessionVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    await logAuditEvent({
+      workspaceId,
+      userId,
+      actionType: "UPDATE",
+      entityType: "account",
+      entityId: userId,
+      entityLabel: user.name ?? null,
+      summary: "Changed account password.",
+      metadata: {
+        action: "password-change",
+      },
+    });
+
+    await setFlashMessage({
+      type: "success",
+      title: "Password updated",
+      message: "Your password has been changed.",
+    });
+    revalidatePath("/account");
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      await setFlashMessage({
+        type: "error",
+        title: "Too many password change attempts",
+        message: error.message,
+      });
+      redirect("/account");
+    }
+
+    throw error;
+  }
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  try {
+    const parsed = requestPasswordResetSchema.safeParse({
+      email: formData.get("email"),
+    });
+
+    if (!parsed.success) {
+      await setFlashMessage({
+        type: "error",
+        title: "Reset request failed",
+        message: parsed.error.issues[0]?.message ?? "Check the email address and try again.",
+      });
+      redirect("/forgot-password");
+    }
+
+    const { email } = parsed.data;
+    const clientIp = await getClientIdentifier();
+    await assertRateLimit({
+      action: "auth:password-reset-request",
+      identifier: `${clientIp}:${email}`,
+      limit: 5,
+      windowMinutes: 30,
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, isActive: true, activeWorkspaceId: true },
+    });
+
+    if (user?.isActive && user.activeWorkspaceId) {
+      const rawToken = createPasswordResetToken();
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
+
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      if (process.env.ALLOW_INSECURE_DEV_RESET_LINKS === "true") {
+        await setFlashMessage({
+          type: "success",
+          title: "Reset link generated",
+          message: `Open /reset-password?token=${rawToken} to continue.`,
+        });
+      } else {
+        await setFlashMessage({
+          type: "success",
+          title: "If that account exists, a reset email would be sent",
+          message: "Check your email for the password reset link.",
+        });
+      }
+    } else {
+      await setFlashMessage({
+        type: "success",
+        title: "If that account exists, a reset email would be sent",
+        message: "Check your email for the password reset link.",
+      });
+    }
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      await setFlashMessage({
+        type: "error",
+        title: "Too many reset requests",
+        message: error.message,
+      });
+      redirect("/forgot-password");
+    }
+
+    throw error;
   }
 
-  if (nextPassword !== confirmPassword) {
-    await setFlashMessage({
-      type: "error",
-      title: "Passwords do not match",
-      message: "Re-enter the new password confirmation and try again.",
-    });
-    redirect("/account");
-  }
+  redirect("/forgot-password");
+}
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { passwordHash: true, name: true },
+export async function resetPassword(formData: FormData) {
+  const parsed = resetPasswordSchema.safeParse({
+    token: formData.get("token"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
   });
 
-  if (!user?.passwordHash || !(await verifyPassword(currentPassword, user.passwordHash))) {
+  if (!parsed.success) {
     await setFlashMessage({
       type: "error",
-      title: "Current password is incorrect",
-      message: "Enter your existing password to make this change.",
+      title: "Reset failed",
+      message: parsed.error.issues[0]?.message ?? "Check the form and try again.",
     });
-    redirect("/account");
+    redirect("/forgot-password");
   }
+
+  const clientIp = await getClientIdentifier();
+  await assertRateLimit({
+    action: "auth:password-reset-confirm",
+    identifier: clientIp,
+    limit: 8,
+    windowMinutes: 30,
+  });
+
+  const tokenHash = hashToken(parsed.data.token);
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          activeWorkspaceId: true,
+        },
+      },
+    },
+  });
+
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+    await setFlashMessage({
+      type: "error",
+      title: "Reset link is invalid",
+      message: "Request a new password reset link and try again.",
+    });
+    redirect("/forgot-password");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: resetToken.userId },
+      data: {
+        passwordHash: await hashPassword(parsed.data.password),
+        sessionVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    await tx.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    if (resetToken.user.activeWorkspaceId) {
+      await tx.auditEvent.create({
+        data: {
+          workspaceId: resetToken.user.activeWorkspaceId,
+          actorUserId: resetToken.userId,
+          actionType: "UPDATE",
+          entityType: "account",
+          entityId: resetToken.userId,
+          entityLabel: resetToken.user.name ?? null,
+          summary: "Completed password reset.",
+          metadata: {
+            action: "password-reset",
+          },
+        },
+      });
+    }
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Password reset complete",
+    message: "Sign in with your new password.",
+  });
+  redirect("/sign-in");
+}
+
+export async function revokeAllSessions() {
+  const { userId, workspaceId } = await getWorkspaceContext();
 
   await prisma.user.update({
     where: { id: userId },
     data: {
-      passwordHash: await hashPassword(nextPassword),
+      sessionVersion: {
+        increment: 1,
+      },
     },
   });
 
@@ -852,16 +1149,18 @@ export async function changeAccountPassword(formData: FormData) {
     actionType: "UPDATE",
     entityType: "account",
     entityId: userId,
-    entityLabel: user.name ?? null,
-    summary: "Changed account password.",
+    summary: "Revoked all active sessions.",
+    metadata: {
+      action: "revoke-all-sessions",
+    },
   });
 
   await setFlashMessage({
     type: "success",
-    title: "Password updated",
-    message: "Your password has been changed.",
+    title: "Sessions revoked",
+    message: "Sign in again on this device to continue.",
   });
-  revalidatePath("/account");
+  redirect("/sign-in");
 }
 
 export async function archiveInventoryItem(formData: FormData) {

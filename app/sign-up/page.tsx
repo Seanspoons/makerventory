@@ -34,12 +34,12 @@ export default function SignUpPage() {
           </div>
           <div>
             <label className="mb-2 block text-sm text-slate-500">Workspace name</label>
-            <Input
-              name="workspaceName"
-              placeholder="Sean's Print Lab"
-              autoComplete="organization"
-              required
-            />
+              <Input
+                name="workspaceName"
+                placeholder="North Forge Print Lab"
+                autoComplete="organization"
+                required
+              />
           </div>
           <div className="sm:col-span-2">
             <label className="mb-2 block text-sm text-slate-500">Email</label>

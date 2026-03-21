@@ -4,11 +4,14 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
+import { assertRateLimit, getClientIdentifierFromRequestLike } from "@/lib/security";
+import { signInSchema } from "@/lib/validation";
 
 declare module "next-auth" {
   interface User {
     workspaceId: string;
     workspaceRole: "OWNER" | "ADMIN" | "MEMBER";
+    sessionVersion: number;
   }
 
   interface Session {
@@ -24,6 +27,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     workspaceId?: string;
     workspaceRole?: "OWNER" | "ADMIN" | "MEMBER";
+    sessionVersion?: number;
+    sessionRevoked?: boolean;
   }
 }
 
@@ -42,13 +47,20 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        const email = credentials?.email?.trim().toLowerCase();
-        const password = credentials?.password ?? "";
-
-        if (!email || !password) {
+      async authorize(credentials, request) {
+        const parsed = signInSchema.safeParse(credentials);
+        if (!parsed.success) {
           return null;
         }
+
+        const { email, password } = parsed.data;
+        const clientIp = getClientIdentifierFromRequestLike(request?.headers);
+        await assertRateLimit({
+          action: "auth:sign-in",
+          identifier: `${clientIp}:${email}`,
+          limit: 8,
+          windowMinutes: 10,
+        });
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -92,6 +104,7 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           workspaceId: activeMembership.workspaceId,
           workspaceRole: activeMembership.role,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
@@ -102,6 +115,8 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         token.workspaceId = user.workspaceId;
         token.workspaceRole = user.workspaceRole;
+        token.sessionVersion = user.sessionVersion;
+        token.sessionRevoked = false;
       }
 
       if (!token.sub) {
@@ -110,10 +125,18 @@ export const authOptions: NextAuthOptions = {
 
       const currentUser = await prisma.user.findUnique({
         where: { id: token.sub },
-        select: { activeWorkspaceId: true, isActive: true },
+        select: { activeWorkspaceId: true, isActive: true, sessionVersion: true },
       });
 
       if (!currentUser?.isActive) {
+        token.sessionRevoked = true;
+        return token;
+      }
+
+      if ((token.sessionVersion ?? 0) !== currentUser.sessionVersion) {
+        token.sessionRevoked = true;
+        token.workspaceId = undefined;
+        token.workspaceRole = undefined;
         return token;
       }
 
@@ -133,15 +156,24 @@ export const authOptions: NextAuthOptions = {
         }));
 
       if (!fallbackMembership) {
+        token.sessionRevoked = true;
         return token;
       }
 
       token.workspaceId = fallbackMembership.workspaceId;
       token.workspaceRole = fallbackMembership.role;
+      token.sessionVersion = currentUser.sessionVersion;
+      token.sessionRevoked = false;
       return token;
     },
     async session({ session, token }) {
-      if (!session.user || !token.sub || !token.workspaceId || !token.workspaceRole) {
+      if (
+        !session.user ||
+        !token.sub ||
+        !token.workspaceId ||
+        !token.workspaceRole ||
+        token.sessionRevoked
+      ) {
         return session;
       }
 
