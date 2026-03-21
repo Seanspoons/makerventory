@@ -2,6 +2,7 @@ import {
   FilamentHygroscopicLevel,
   ImportEntityType,
   ImportJobStatus,
+  ImportRowResolution,
   ImportRowStatus,
   Prisma,
   StockStatus,
@@ -60,12 +61,56 @@ export type ImportEntityOption = (typeof importEntityOptions)[number];
 type StagedRow = {
   rowIndex: number;
   status: ImportRowStatus;
+  resolution: ImportRowResolution;
   fingerprint: string;
   suggestedMatchId?: string;
   suggestedMatchSlug?: string;
+  resolvedMatchId?: string;
+  resolvedMatchSlug?: string;
   data: Prisma.InputJsonValue;
   validationErrors: string[];
 };
+
+export const importFieldConfigs = {
+  FILAMENT: [
+    { key: "brand", label: "Brand", required: true },
+    { key: "materialType", label: "Material type", required: true },
+    { key: "color", label: "Color", required: true },
+    { key: "quantity", label: "Quantity" },
+    { key: "estimatedRemainingGrams", label: "Remaining grams" },
+    { key: "abrasive", label: "Abrasive" },
+    { key: "dryingRequired", label: "Drying required" },
+    { key: "hygroscopicLevel", label: "Hygroscopic level" },
+  ],
+  CONSUMABLE: [
+    { key: "name", label: "Name", required: true },
+    { key: "category", label: "Category", required: true },
+    { key: "quantity", label: "Quantity" },
+    { key: "unit", label: "Unit", required: true },
+    { key: "reorderThreshold", label: "Reorder threshold" },
+    { key: "status", label: "Status" },
+    { key: "storageLocation", label: "Storage location" },
+  ],
+  TOOL_PART: [
+    { key: "name", label: "Name", required: true },
+    { key: "category", label: "Category", required: true },
+    { key: "quantity", label: "Quantity" },
+    { key: "storageLocation", label: "Storage location" },
+    { key: "notes", label: "Notes" },
+  ],
+  WISHLIST: [
+    { key: "name", label: "Name", required: true },
+    { key: "category", label: "Category", required: true },
+    { key: "priority", label: "Priority" },
+    { key: "estimatedCost", label: "Estimated cost" },
+    { key: "vendor", label: "Vendor" },
+    { key: "purchaseUrl", label: "Purchase URL" },
+    { key: "status", label: "Status" },
+  ],
+} satisfies Record<ImportEntityType, Array<{ key: string; label: string; required?: boolean }>>;
+
+export type ImportFieldConfig = (typeof importFieldConfigs)[ImportEntityType][number];
+export type ImportFieldMapping = Record<string, string>;
 
 function parseBoolean(value: unknown) {
   if (typeof value !== "string") return false;
@@ -86,6 +131,34 @@ function parseOptionalString(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function normalizeColumnKey(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function mapRecordFields(
+  record: Record<string, string>,
+  fieldMapping: ImportFieldMapping,
+) {
+  const normalizedRecord = new Map<string, string>();
+  for (const [key, value] of Object.entries(record)) {
+    normalizedRecord.set(normalizeColumnKey(key), value);
+  }
+
+  const mapped: Record<string, string> = {};
+  for (const [targetField, sourceColumn] of Object.entries(fieldMapping)) {
+    const normalizedSource = normalizeColumnKey(sourceColumn);
+    if (!normalizedSource) {
+      continue;
+    }
+    const value = normalizedRecord.get(normalizedSource);
+    if (typeof value === "string") {
+      mapped[targetField] = value;
+    }
+  }
+
+  return mapped;
 }
 
 function parseStockStatus(value: unknown, validationErrors: string[]) {
@@ -166,6 +239,7 @@ function finalizeRows(rows: StagedRow[]) {
     return {
       ...row,
       status: ImportRowStatus.CONFLICT,
+      resolution: ImportRowResolution.SKIP,
       validationErrors: [
         ...row.validationErrors,
         `duplicate fingerprint in upload batch at row(s): ${duplicateIndices.join(", ")}`,
@@ -245,13 +319,22 @@ async function stageFilamentRows(
         : match
           ? ImportRowStatus.MATCHED
           : ImportRowStatus.NEW;
+    const resolution =
+      validationErrors.length > 0
+        ? ImportRowResolution.SKIP
+        : match
+          ? ImportRowResolution.UPDATE_MATCH
+          : ImportRowResolution.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
       status,
+      resolution,
       fingerprint,
       suggestedMatchId: match?.id,
       suggestedMatchSlug: match ? fingerprint : undefined,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match ? fingerprint : undefined,
       validationErrors,
       data: {
         brand,
@@ -306,13 +389,22 @@ async function stageConsumableRows(
         : match
           ? ImportRowStatus.MATCHED
           : ImportRowStatus.NEW;
+    const resolution =
+      validationErrors.length > 0
+        ? ImportRowResolution.SKIP
+        : match
+          ? ImportRowResolution.UPDATE_MATCH
+          : ImportRowResolution.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
       status,
+      resolution,
       fingerprint,
       suggestedMatchId: match?.id,
       suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
       validationErrors,
       data: {
         name,
@@ -354,13 +446,22 @@ async function stageToolRows(
         : match
           ? ImportRowStatus.MATCHED
           : ImportRowStatus.NEW;
+    const resolution =
+      validationErrors.length > 0
+        ? ImportRowResolution.SKIP
+        : match
+          ? ImportRowResolution.UPDATE_MATCH
+          : ImportRowResolution.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
       status,
+      resolution,
       fingerprint,
       suggestedMatchId: match?.id,
       suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
       validationErrors,
       data: {
         name,
@@ -399,13 +500,22 @@ async function stageWishlistRows(
         : match
           ? ImportRowStatus.MATCHED
           : ImportRowStatus.NEW;
+    const resolution =
+      validationErrors.length > 0
+        ? ImportRowResolution.SKIP
+        : match
+          ? ImportRowResolution.UPDATE_MATCH
+          : ImportRowResolution.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
       status,
+      resolution,
       fingerprint,
       suggestedMatchId: match?.id,
       suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
       validationErrors,
       data: {
         name,
@@ -427,16 +537,22 @@ export async function stageImportRecords(
   workspaceId: string,
   entityType: ImportEntityType,
   records: Record<string, string>[],
+  fieldMapping?: ImportFieldMapping,
 ) {
+  const mappedRecords =
+    fieldMapping && Object.keys(fieldMapping).length > 0
+      ? records.map((record) => mapRecordFields(record, fieldMapping))
+      : records;
+
   switch (entityType) {
     case ImportEntityType.FILAMENT:
-      return stageFilamentRows(workspaceId, records);
+      return stageFilamentRows(workspaceId, mappedRecords);
     case ImportEntityType.CONSUMABLE:
-      return stageConsumableRows(workspaceId, records);
+      return stageConsumableRows(workspaceId, mappedRecords);
     case ImportEntityType.TOOL_PART:
-      return stageToolRows(workspaceId, records);
+      return stageToolRows(workspaceId, mappedRecords);
     case ImportEntityType.WISHLIST:
-      return stageWishlistRows(workspaceId, records);
+      return stageWishlistRows(workspaceId, mappedRecords);
     default:
       return [];
   }
@@ -449,6 +565,7 @@ export async function createImportJobWithRows(args: {
   sourceName: string;
   originalFilename: string;
   notes?: string | null;
+  fieldMapping?: ImportFieldMapping | null;
   rows: StagedRow[];
 }) {
   const summary = summarize(args.rows);
@@ -462,6 +579,10 @@ export async function createImportJobWithRows(args: {
       sourceName: args.sourceName,
       originalFilename: args.originalFilename,
       notes: args.notes ?? null,
+      fieldMapping:
+        args.fieldMapping && Object.keys(args.fieldMapping).length > 0
+          ? args.fieldMapping
+          : undefined,
       ...summary,
       rows: {
         create: args.rows.map((row) => ({
@@ -469,9 +590,12 @@ export async function createImportJobWithRows(args: {
           rowIndex: row.rowIndex,
           entityType: args.entityType,
           status: row.status,
+          resolution: row.resolution,
           fingerprint: row.fingerprint,
           suggestedMatchId: row.suggestedMatchId,
           suggestedMatchSlug: row.suggestedMatchSlug,
+          resolvedMatchId: row.resolvedMatchId,
+          resolvedMatchSlug: row.resolvedMatchSlug,
           data: row.data,
           validationErrors: row.validationErrors,
         })),
@@ -506,6 +630,10 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         continue;
       }
 
+      if (row.resolution === ImportRowResolution.SKIP) {
+        continue;
+      }
+
       const payload = row.data as Record<string, unknown>;
 
       if (job.entityType === ImportEntityType.FILAMENT) {
@@ -533,9 +661,9 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
               : ["General Purpose"],
         };
 
-        if (row.suggestedMatchId) {
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.filamentSpool.update({
-            where: { id: row.suggestedMatchId },
+            where: { id: row.resolvedMatchId },
             data: {
               ...common,
               filamentRecommendation: {
@@ -589,9 +717,9 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           storageLocation: (payload.storageLocation as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.suggestedMatchId) {
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.consumableItem.update({
-            where: { id: row.suggestedMatchId },
+            where: { id: row.resolvedMatchId },
             data: common,
           });
         } else {
@@ -610,9 +738,9 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           storageLocation: (payload.storageLocation as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.suggestedMatchId) {
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.toolPart.update({
-            where: { id: row.suggestedMatchId },
+            where: { id: row.resolvedMatchId },
             data: common,
           });
         } else {
@@ -634,9 +762,9 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           purchaseUrl: (payload.purchaseUrl as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.suggestedMatchId) {
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.wishlistItem.update({
-            where: { id: row.suggestedMatchId },
+            where: { id: row.resolvedMatchId },
             data: common,
           });
         } else {

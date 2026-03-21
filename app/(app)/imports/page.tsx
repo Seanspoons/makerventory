@@ -1,7 +1,12 @@
 import Link from "next/link";
-import { ImportRowStatus } from "@prisma/client";
+import { ImportRowResolution, ImportRowStatus } from "@prisma/client";
 import { format } from "date-fns";
-import { applyStagedImport, stageImportJob, updateImportRowDecision } from "@/app/actions";
+import {
+  applyStagedImport,
+  stageImportJob,
+  updateImportRowDecision,
+  updateImportRowResolution,
+} from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 import { PageHeader } from "@/components/page-header";
@@ -12,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getImportJobs } from "@/lib/data";
-import { importEntityOptions } from "@/lib/imports";
+import { importEntityOptions, importFieldConfigs } from "@/lib/imports";
 import { cn, titleCase } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -41,10 +46,21 @@ function canSkipRow(status: ImportRowStatus) {
   return status === ImportRowStatus.NEW || status === ImportRowStatus.MATCHED;
 }
 
+function resolutionLabel(resolution: ImportRowResolution) {
+  if (resolution === ImportRowResolution.UPDATE_MATCH) return "Update match";
+  if (resolution === ImportRowResolution.SKIP) return "Skip";
+  return "Create new";
+}
+
 export default async function ImportsPage(props: { searchParams?: SearchParams }) {
   const searchParams = (await props.searchParams) ?? {};
   const selected =
     typeof searchParams.selected === "string" ? searchParams.selected : null;
+  const entityTypeParam =
+    typeof searchParams.entityType === "string" ? searchParams.entityType : "FILAMENT";
+  const selectedEntityType = importEntityOptions.some((option) => option.value === entityTypeParam)
+    ? entityTypeParam
+    : "FILAMENT";
   const { jobs, selectedJob } = await getImportJobs(selected);
   const actionableRows =
     selectedJob?.rows.filter(
@@ -81,7 +97,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           <form action={stageImportJob} className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm text-slate-500">Entity type</label>
-              <Select name="entityType" defaultValue="FILAMENT" required>
+              <Select name="entityType" defaultValue={selectedEntityType} required>
                 {importEntityOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -107,6 +123,34 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                 name="notes"
                 placeholder="Record where this export came from, what was cleaned, and any assumptions before apply."
               />
+            </div>
+            <div className="lg:col-span-2 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-slate-950">Column mapping</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Override source column names when your CSV headers do not exactly match the template.
+                  </p>
+                </div>
+                <Button asChild variant="secondary" size="sm">
+                  <Link href={`/imports?entityType=${selectedEntityType}`}>Refresh field list</Link>
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {importFieldConfigs[selectedEntityType as keyof typeof importFieldConfigs].map((field) => (
+                  <div key={field.key}>
+                    <label className="mb-2 block text-sm text-slate-500">
+                      {field.label}
+                      {field.required ? " *" : ""}
+                    </label>
+                    <Input
+                      name={`mapping:${field.key}`}
+                      placeholder={field.key}
+                      defaultValue={field.key}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="lg:col-span-2 grid gap-3 md:grid-cols-2">
               {importEntityOptions.map((option) => (
@@ -261,6 +305,11 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   <p className="mt-1">
                     {selectedJob.notes ?? "No operator notes were recorded for this job."}
                   </p>
+                  {selectedJob.fieldMapping ? (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Custom column mapping saved for this import job.
+                    </p>
+                  ) : null}
                 </div>
                 {selectedJob.status === "STAGED" ? (
                   <ConfirmActionForm
@@ -289,6 +338,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                     <tr>
                       <th className="px-4 py-3 font-medium">Row</th>
                       <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Apply as</th>
                       <th className="px-4 py-3 font-medium">Suggested match</th>
                       <th className="px-4 py-3 font-medium">Validation</th>
                       <th className="px-4 py-3 font-medium">Payload</th>
@@ -303,7 +353,26 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           <StatusBadge value={row.status} />
                         </td>
                         <td className="px-4 py-4 text-slate-600">
-                          {row.suggestedMatchSlug ? row.suggestedMatchSlug : "New record"}
+                          {selectedJob.status === "STAGED" && row.status !== ImportRowStatus.APPLIED ? (
+                            <form action={updateImportRowResolution} className="space-y-2">
+                              <input type="hidden" name="rowId" value={row.id} />
+                              <Select name="resolution" defaultValue={row.resolution}>
+                                <option value="CREATE_NEW">Create new</option>
+                                <option value="UPDATE_MATCH" disabled={!row.suggestedMatchId}>
+                                  Update suggested match
+                                </option>
+                                <option value="SKIP">Skip</option>
+                              </Select>
+                              <SubmitButton variant="secondary" size="sm">
+                                Save
+                              </SubmitButton>
+                            </form>
+                          ) : (
+                            resolutionLabel(row.resolution)
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-slate-600">
+                          {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
                           {row.validationErrors.length > 0 ? (

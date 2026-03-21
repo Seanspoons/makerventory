@@ -17,6 +17,7 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import {
   applyImportJobRows,
   createImportJobWithRows,
+  importFieldConfigs,
   importEntityOptions,
   readCsvFile,
   stageImportRecords,
@@ -93,6 +94,15 @@ function importEntityValue(formData: FormData, key = "entityType") {
 
 function booleanValue(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
+}
+
+function summarizeImportRows(rows: Array<{ status: string }>) {
+  return {
+    newRows: rows.filter((item) => item.status === "NEW").length,
+    matchedRows: rows.filter((item) => item.status === "MATCHED").length,
+    conflictRows: rows.filter((item) => item.status === "CONFLICT").length,
+    skippedRows: rows.filter((item) => item.status === "SKIPPED" || item.status === "ERROR").length,
+  };
 }
 
 async function getWorkspaceContext() {
@@ -1340,8 +1350,16 @@ export async function stageImportJob(formData: FormData) {
 
   const sourceName = optionalString(formData, "sourceName") ?? file.name.replace(/\.csv$/i, "");
   const notes = optionalString(formData, "notes");
+  const fieldMapping = Object.fromEntries(
+    importFieldConfigs[entityType]
+      .map((field) => {
+        const value = optionalString(formData, `mapping:${field.key}`);
+        return value ? [field.key, value] : null;
+      })
+      .filter((entry): entry is [string, string] => Boolean(entry)),
+  );
   const records = await readCsvFile(file);
-  const rows = await stageImportRecords(workspaceId, entityType, records);
+  const rows = await stageImportRecords(workspaceId, entityType, records, fieldMapping);
 
   const job = await createImportJobWithRows({
     workspaceId,
@@ -1350,6 +1368,7 @@ export async function stageImportJob(formData: FormData) {
     sourceName,
     originalFilename: file.name,
     notes,
+    fieldMapping,
     rows,
   });
 
@@ -1436,11 +1455,20 @@ export async function updateImportRowDecision(formData: FormData) {
         : row.suggestedMatchId
           ? "MATCHED"
           : "NEW";
+  const nextResolution =
+    decision === "skip"
+      ? "SKIP"
+      : row.suggestedMatchId
+        ? "UPDATE_MATCH"
+        : "CREATE_NEW";
 
   await prisma.importRow.update({
     where: { id: rowId },
     data: {
       status: nextStatus,
+      resolution: nextResolution,
+      resolvedMatchId: nextResolution === "UPDATE_MATCH" ? row.suggestedMatchId : null,
+      resolvedMatchSlug: nextResolution === "UPDATE_MATCH" ? row.suggestedMatchSlug : null,
     },
   });
 
@@ -1451,12 +1479,7 @@ export async function updateImportRowDecision(formData: FormData) {
 
   await prisma.importJob.update({
     where: { id: row.importJobId },
-    data: {
-      newRows: rows.filter((item) => item.status === "NEW").length,
-      matchedRows: rows.filter((item) => item.status === "MATCHED").length,
-      conflictRows: rows.filter((item) => item.status === "CONFLICT").length,
-      skippedRows: rows.filter((item) => item.status === "SKIPPED" || item.status === "ERROR").length,
-    },
+    data: summarizeImportRows(rows),
   });
 
   await logAuditEvent({
@@ -1471,6 +1494,7 @@ export async function updateImportRowDecision(formData: FormData) {
       importJobId: row.importJobId,
       rowIndex: row.rowIndex,
       nextStatus,
+      nextResolution,
     },
   });
 
@@ -1481,6 +1505,94 @@ export async function updateImportRowDecision(formData: FormData) {
       decision === "skip"
         ? "The staged row will not be applied."
         : "The staged row is back in the apply queue if it is valid.",
+  });
+  revalidatePath("/imports");
+}
+
+export async function updateImportRowResolution(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const rowId = requiredString(formData, "rowId");
+  const resolution = requiredString(formData, "resolution");
+
+  if (!["CREATE_NEW", "UPDATE_MATCH", "SKIP"].includes(resolution)) {
+    throw new Error("Unsupported import row resolution.");
+  }
+
+  const row = await prisma.importRow.findFirst({
+    where: { id: rowId, workspaceId },
+    include: {
+      importJob: true,
+    },
+  });
+
+  if (!row) {
+    throw new Error("Import row not found.");
+  }
+
+  if (row.importJob.status !== "STAGED") {
+    throw new Error("Only staged imports can be edited.");
+  }
+
+  if (resolution === "UPDATE_MATCH" && !row.suggestedMatchId) {
+    throw new Error("This row does not have a suggested match.");
+  }
+
+  const nextStatus =
+    resolution === "SKIP"
+      ? row.validationErrors.length > 0
+        ? "ERROR"
+        : "SKIPPED"
+      : row.validationErrors.length > 0
+        ? "ERROR"
+        : resolution === "UPDATE_MATCH"
+          ? "MATCHED"
+          : "NEW";
+
+  await prisma.importRow.update({
+    where: { id: rowId },
+    data: {
+      resolution: resolution as "CREATE_NEW" | "UPDATE_MATCH" | "SKIP",
+      status: nextStatus,
+      resolvedMatchId: resolution === "UPDATE_MATCH" ? row.suggestedMatchId : null,
+      resolvedMatchSlug: resolution === "UPDATE_MATCH" ? row.suggestedMatchSlug : null,
+    },
+  });
+
+  const rows = await prisma.importRow.findMany({
+    where: { importJobId: row.importJobId },
+    select: { status: true },
+  });
+
+  await prisma.importJob.update({
+    where: { id: row.importJobId },
+    data: summarizeImportRows(rows),
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "import-row",
+    entityId: rowId,
+    entityLabel: row.importJob.sourceName,
+    summary: `Changed staged row resolution to ${resolution.toLowerCase().replace("_", " ")}.`,
+    metadata: {
+      importJobId: row.importJobId,
+      rowIndex: row.rowIndex,
+      resolution,
+      nextStatus,
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Row resolution updated",
+    message:
+      resolution === "SKIP"
+        ? "This row will stay out of the apply set."
+        : resolution === "UPDATE_MATCH"
+          ? "This row is set to update the suggested match."
+          : "This row is set to create a new record.",
   });
   revalidatePath("/imports");
 }

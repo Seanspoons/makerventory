@@ -124,6 +124,12 @@ enum ImportRowStatus {
   ERROR
 }
 
+enum ImportRowResolution {
+  CREATE_NEW
+  UPDATE_MATCH
+  SKIP
+}
+
 enum AuditActionType {
   CREATE
   UPDATE
@@ -237,6 +243,7 @@ model ImportJob {
   sourceName       String
   originalFilename String
   notes            String?         @db.Text
+  fieldMapping     Json?
   totalRows        Int             @default(0)
   newRows          Int             @default(0)
   matchedRows      Int             @default(0)
@@ -259,9 +266,12 @@ model ImportRow {
   rowIndex           Int
   entityType         ImportEntityType
   status             ImportRowStatus @default(NEW)
+  resolution         ImportRowResolution @default(CREATE_NEW)
   fingerprint        String
   suggestedMatchId   String?
   suggestedMatchSlug String?
+  resolvedMatchId    String?
+  resolvedMatchSlug  String?
   data               Json
   validationErrors   String[]
   appliedAt          DateTime?
