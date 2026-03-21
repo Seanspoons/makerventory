@@ -3,6 +3,7 @@ import type { ImportRowResolution } from "@prisma/client";
 import { ImportRowStatus } from "@prisma/client";
 import { format } from "date-fns";
 import {
+  applyAllStagedImports,
   applyStagedImport,
   stageImportJob,
   stageInventoryNotesImport,
@@ -84,6 +85,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
   const selectedJobHref = selectedJob
     ? `/imports?selected=${selectedJob.id}&rowStatus=${selectedRowFilter}#staged-job`
     : "/imports#staged-job";
+  const stagedJobs = jobs.filter((job) => job.status === "STAGED");
   const actionableRows =
     selectedJob?.rows.filter(
       (row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED,
@@ -305,6 +307,28 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           title="Recent import jobs"
           description="Open a staged job to inspect row-level validation, suggested matches, and apply readiness."
         >
+          {stagedJobs.length > 0 ? (
+            <div className="mb-4 rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-sm text-slate-600">
+                {stagedJobs.length} staged job{stagedJobs.length === 1 ? "" : "s"} ready for batch apply.
+              </p>
+              <div className="mt-3">
+                <ConfirmActionForm
+                  action={applyAllStagedImports}
+                  title="Apply all staged imports"
+                  description="This applies every staged import job in the current workspace. Blocked rows will remain staged and unapplied."
+                  confirmLabel="Apply all staged jobs"
+                  triggerLabel="Apply all staged jobs"
+                  triggerVariant="secondary"
+                >
+                  <input type="hidden" name="returnTo" value="/imports#staged-job" />
+                  <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                    {stagedJobs.length} staged job(s) will be applied in sequence.
+                  </div>
+                </ConfirmActionForm>
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-3 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:pr-2">
             {jobs.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
@@ -317,7 +341,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               return (
                 <Link
                   key={job.id}
-                  href={`/imports?selected=${job.id}`}
+                  href={`/imports?selected=${job.id}&rowStatus=${selectedRowFilter}#staged-job`}
                   className={cn(
                     "block min-w-0 rounded-[24px] border p-4 transition",
                     isSelected

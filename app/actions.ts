@@ -1520,6 +1520,67 @@ export async function applyStagedImport(formData: FormData) {
   }
 }
 
+export async function applyAllStagedImports(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
+  const returnTo = optionalString(formData, "returnTo");
+
+  const stagedJobs = await prisma.importJob.findMany({
+    where: { workspaceId, status: "STAGED" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, entityType: true, sourceName: true },
+  });
+
+  if (stagedJobs.length === 0) {
+    await setFlashMessage({
+      type: "error",
+      title: "No staged imports",
+      message: "There are no staged import jobs ready to apply.",
+    });
+    revalidatePath("/imports");
+    if (returnTo) {
+      redirect(returnTo as Parameters<typeof redirect>[0]);
+    }
+    return;
+  }
+
+  const appliedJobs = [];
+  for (const stagedJob of stagedJobs) {
+    const appliedJob = await applyImportJobRows(stagedJob.id, workspaceId);
+    appliedJobs.push(appliedJob);
+  }
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "IMPORT_APPLY",
+    entityType: "import-job",
+    summary: "Applied all staged import jobs.",
+    metadata: {
+      appliedJobs: appliedJobs.map((job) => ({
+        id: job.id,
+        entityType: job.entityType,
+        sourceName: job.sourceName,
+      })),
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Staged imports applied",
+    message: `${appliedJobs.length} staged import job(s) were applied to inventory.`,
+  });
+  logInfo("imports.apply_all_succeeded", {
+    ...logContext,
+    appliedJobs: appliedJobs.length,
+    entityTypes: appliedJobs.map((job) => job.entityType),
+  });
+  revalidateInventory();
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
+}
+
 export async function updateImportRowDecision(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
   const rowId = requiredString(formData, "rowId");
