@@ -293,12 +293,13 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         </div>
       </SectionCard>
 
-      <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.25fr)] xl:items-start">
         <SectionCard
+          className="xl:sticky xl:top-6"
           title="Recent import jobs"
           description="Open a staged job to inspect row-level validation, suggested matches, and apply readiness."
         >
-          <div className="space-y-3">
+          <div className="space-y-3 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:pr-2">
             {jobs.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
                 No import jobs yet. Stage a CSV above to begin onboarding real data.
