@@ -184,6 +184,7 @@ async function assertOwnedRecord(kind: string, id: string, workspaceId: string) 
 export async function createInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const { userId, workspaceId } = await getWorkspaceContext();
+  const returnTo = optionalString(formData, "returnTo");
   let createdId: string | null = null;
   let createdLabel: string | null = null;
 
@@ -414,6 +415,9 @@ export async function createInventoryItem(formData: FormData) {
     message: "The inventory record was added successfully.",
   });
   revalidateInventory();
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
 }
 
 export async function signUpUser(formData: FormData) {
