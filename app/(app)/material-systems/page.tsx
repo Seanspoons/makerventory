@@ -18,16 +18,23 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
   const searchParams = (await props.searchParams) ?? {};
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const type = typeof searchParams.type === "string" ? searchParams.type : "ALL";
+  const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
   const items = await getMaterialSystems();
 
   const filtered = items.filter((item) => {
     const haystack = [item.name, item.notes ?? "", item.assignedPrinter?.name ?? ""].join(" ").toLowerCase();
     return (q ? haystack.includes(q) : true) && (type === "ALL" ? true : item.type === type);
   });
+  const detail = filtered.find((item) => item.id === selected) ?? filtered[0] ?? null;
+  const assignedCount = filtered.filter((item) => item.assignedPrinterId).length;
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Material Flow" title="Material Systems / Dryers" description="Track AMS units, dryers, assignments, and supported material notes across the workshop." />
+      <PageHeader
+        eyebrow="Inventory"
+        title="Material Systems"
+        description="Track AMS units and dryers by assignment first, then open detail for supported materials and notes."
+      />
       <QuickAddShell title="Add material system" description="Record a new AMS unit or dryer for compatibility and assignment planning.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="material-system" />
@@ -43,6 +50,22 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
           <div className="lg:col-span-2"><SubmitButton>Add material system</SubmitButton></div>
         </form>
       </QuickAddShell>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Systems in view</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{filtered.length}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Assigned to printer</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{assignedCount}</p>
+        </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Unassigned / shared</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{filtered.length - assignedCount}</p>
+        </div>
+      </div>
+
       <form className="space-y-5">
         <FilterBar>
           <div className="min-w-0 flex-1 sm:min-w-[220px]"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search systems" /></div>
@@ -50,33 +73,60 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
           <SubmitButton variant="secondary">Apply filters</SubmitButton>
         </FilterBar>
       </form>
-      <SectionCard title="Systems inventory" description={`${filtered.length} systems in view.`}>
-        <div className="space-y-3">
-          {filtered.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-slate-950">{item.name}</p>
+
+      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr] xl:items-start">
+        <SectionCard title="Systems list" description="Scan assignment and status first, then open a system when you need compatibility notes." className="xl:sticky xl:top-6">
+          <div className="space-y-3 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:pr-2">
+            {filtered.map((item) => {
+              const href = `/material-systems?selected=${item.id}`;
+              const isSelected = detail?.id === item.id;
+              return (
+                <a
+                  key={item.id}
+                  href={href}
+                  className={`block rounded-[24px] border p-4 transition ${isSelected ? "border-slate-900 bg-slate-950 text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`break-words font-medium ${isSelected ? "text-white" : "text-slate-950"}`}>{item.name}</p>
+                      <p className={`mt-1 break-words text-sm ${isSelected ? "text-white/75" : "text-slate-500"}`}>
+                        {item.type} · {item.assignedPrinter?.name ?? "Shared / unassigned"}
+                      </p>
+                    </div>
                     <StatusBadge value={item.status} />
                   </div>
-                  <p className="mt-2 text-sm text-slate-500">{item.type} · {item.assignedPrinter?.name ?? "Shared / unassigned"}</p>
-                  {item.supportedMaterialsNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{item.supportedMaterialsNotes}</p> : null}
-                  {item.notes ? <p className="mt-2 text-sm leading-6 text-slate-500">{item.notes}</p> : null}
+                </a>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard title={detail ? detail.name : "Selected system"} description="Keep supported-material detail and less-common editing controls in one place.">
+          {detail ? (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <h2 className="break-words text-2xl font-semibold tracking-tight text-slate-950">{detail.name}</h2>
+                    <StatusBadge value={detail.status} />
+                  </div>
+                  <p className="mt-2 break-words text-sm text-slate-500">
+                    {detail.type} · {detail.assignedPrinter?.name ?? "Shared / unassigned"}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <EditDialog title={`Edit ${item.name}`} description="Update the material system or dryer record.">
+                <div className="flex flex-wrap gap-2">
+                  <EditDialog title={`Edit ${detail.name}`} description="Update the material system or dryer record.">
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="material-system" />
-                      <input type="hidden" name="id" value={item.id} />
-                      <Input name="name" defaultValue={item.name} required />
-                      <Select name="type" defaultValue={item.type}>
+                      <input type="hidden" name="id" value={detail.id} />
+                      <Input name="name" defaultValue={detail.name} required />
+                      <Select name="type" defaultValue={detail.type}>
                         <option value="AMS_LITE">AMS Lite</option>
                         <option value="AMS_2_PRO">AMS 2 Pro</option>
                         <option value="AMS_HT">AMS HT</option>
                         <option value="DRYER">Dryer</option>
                       </Select>
-                      <Select name="status" defaultValue={item.status}>
+                      <Select name="status" defaultValue={detail.status}>
                         <option value="ACTIVE">Active</option>
                         <option value="STANDBY">Standby</option>
                         <option value="MAINTENANCE">Maintenance</option>
@@ -84,18 +134,49 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                         <option value="ARCHIVED">Archived</option>
                       </Select>
                       <div />
-                      <Textarea name="supportedMaterialsNotes" defaultValue={item.supportedMaterialsNotes ?? ""} className="lg:col-span-2" />
-                      <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
+                      <Textarea name="supportedMaterialsNotes" defaultValue={detail.supportedMaterialsNotes ?? ""} className="lg:col-span-2" />
+                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>
-                  <ArchiveForm id={item.id} kind="material-system" />
+                  <ArchiveForm id={detail.id} kind="material-system" />
                 </div>
               </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Assigned printer</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{detail.assignedPrinter?.name ?? "None linked"}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Compatible printers</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">
+                    {detail.compatiblePrinters.map((printer) => printer.printer.name).join(", ") || "Not configured"}
+                  </p>
+                </div>
+              </div>
+
+              <details className="rounded-[24px] border border-slate-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-4 font-medium text-slate-950">
+                  Supported materials and notes
+                </summary>
+                <div className="grid gap-4 border-t border-slate-100 p-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                    {detail.supportedMaterialsNotes ?? "No supported material notes recorded."}
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                    {detail.notes ?? "No additional notes recorded."}
+                  </div>
+                </div>
+              </details>
             </div>
-          ))}
-        </div>
-      </SectionCard>
+          ) : (
+            <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+              No material systems match the current filters.
+            </div>
+          )}
+        </SectionCard>
+      </div>
     </div>
   );
 }
