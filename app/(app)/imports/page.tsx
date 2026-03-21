@@ -9,6 +9,7 @@ import {
   updateImportRowResolution,
 } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
+import { NotesImportPanel } from "@/components/imports/notes-import-panel";
 import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
@@ -176,32 +177,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           title="Paste inventory notes"
           description="Paste Apple Notes or similar text exports and stage multiple inventory jobs from one structured note."
         >
-          <form action={stageInventoryNotesImport} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm text-slate-500">Source label</label>
-              <Input
-                name="sourceName"
-                placeholder="Apple Notes workshop inventory"
-                maxLength={80}
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-slate-500">Pasted notes</label>
-              <Textarea
-                name="notesText"
-                placeholder="Paste your structured workshop notes here"
-                className="min-h-[280px]"
-                required
-              />
-            </div>
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
-              <p className="font-medium text-slate-950">Supported headings</p>
-              <p className="mt-2">
-                Printers, Automatic Material System (AMS) / Dryers, Build Plates, Hotends, Filament, Consumables &amp; Maintenance, Safety &amp; Air Quality, Extra Structural Printer Components, Smart Plugs, Related Tools and Parts, and Items to Buy.
-              </p>
-            </div>
-            <SubmitButton>Stage notes import</SubmitButton>
-          </form>
+          <NotesImportPanel action={stageInventoryNotesImport} />
         </SectionCard>
       </div>
 
