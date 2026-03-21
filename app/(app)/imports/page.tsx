@@ -23,7 +23,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getImportJobs } from "@/lib/data";
 import { importEntityOptions, importFieldConfigs } from "@/lib/imports";
-import { cn, titleCase } from "@/lib/utils";
+import { cn, formatEntityName } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -291,7 +291,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           </div>
           <form action={stageImportJob} className="grid gap-4 lg:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm text-slate-500">Entity type</label>
+              <label className="mb-2 block text-sm text-slate-500">Inventory type</label>
               <Select name="entityType" defaultValue={selectedEntityType} required>
                 {importEntityOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -328,7 +328,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   </p>
                 </div>
                 <Button asChild variant="secondary" size="sm">
-                  <Link href={`/imports?entityType=${selectedEntityType}`}>Refresh field list</Link>
+                  <Link href={`/imports?entityType=${selectedEntityType}`}>Refresh field map</Link>
                 </Button>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -340,7 +340,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                     </label>
                     <Input
                       name={`mapping:${field.key}`}
-                      placeholder={field.key}
+                      placeholder={`CSV column for ${field.label.toLowerCase()}`}
                       defaultValue={field.key}
                     />
                   </div>
@@ -463,7 +463,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                         {job.sourceName}
                       </p>
                       <p className={cn("mt-1 break-words text-sm", isSelected ? "text-white/75" : "text-slate-500")}>
-                        {titleCase(job.entityType)} · {job.originalFilename}
+                        {formatEntityName(job.entityType)} · {job.originalFilename}
                       </p>
                     </div>
                     <StatusBadge value={job.status} />
@@ -529,7 +529,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
                 <div className="text-sm text-slate-600">
                   <p className="font-medium text-slate-950">
-                    {titleCase(selectedJob.entityType)} import
+                    {formatEntityName(selectedJob.entityType)} import
                   </p>
                   <p className="mt-1">
                     {selectedJob.notes ?? "No operator notes were recorded for this job."}

@@ -61,6 +61,33 @@ export function formatBuildPlateSize(sizeMm: number | null | undefined) {
   return `${sizeMm.toString()} mm`;
 }
 
+export function formatEntityName(value: string | null | undefined) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const labels: Record<string, string> = {
+    PRINTER: "Printers",
+    MATERIAL_SYSTEM: "Material Systems",
+    BUILD_PLATE: "Build Plates",
+    HOTEND: "Hotends",
+    FILAMENT: "Filament",
+    CONSUMABLE: "Consumables",
+    SAFETY: "Safety",
+    SMART_PLUG: "Smart Plugs",
+    TOOL_PART: "Tools / Parts",
+    WISHLIST: "Wishlist",
+    "import-job": "Import Job",
+    "import-row": "Import Row",
+    workspace: "Workspace",
+    account: "Account",
+    maintenance: "Maintenance",
+    filament: "Filament",
+  };
+
+  return labels[value] ?? titleCase(value);
+}
+
 export function deriveConsumableStatus(quantity: number, reorderThreshold: number) {
   if (quantity <= 0) {
     return "OUT" as const;

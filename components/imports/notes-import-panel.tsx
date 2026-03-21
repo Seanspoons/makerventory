@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { Textarea } from "@/components/ui/textarea";
-import { cn, titleCase } from "@/lib/utils";
+import { cn, formatEntityName } from "@/lib/utils";
 
 type PreviewRow = {
   rowIndex: number;
@@ -136,7 +136,7 @@ export function NotesImportPanel({
           </div>
 
           {preview.map((group) => {
-            const entityLabel = titleCase(group.entityType ?? undefined);
+            const entityLabel = formatEntityName(group.entityType ?? undefined);
 
             return (
               <div key={group.sourceName} className="rounded-[24px] border border-slate-200 bg-white p-4">

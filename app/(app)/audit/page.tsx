@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { getAuditEvents } from "@/lib/data";
+import { formatEntityName } from "@/lib/utils";
 
 type AuditEvent = Awaited<ReturnType<typeof getAuditEvents>>[number];
 
@@ -42,8 +43,8 @@ export default async function AuditPage() {
                     <StatusBadge value={event.actionType} />
                   </td>
                   <td className="px-4 py-4 text-slate-600">
-                    <p className="font-medium text-slate-950">{event.entityLabel ?? event.entityType}</p>
-                    <p className="mt-1">{event.entityType}</p>
+                    <p className="font-medium text-slate-950">{event.entityLabel ?? formatEntityName(event.entityType)}</p>
+                    <p className="mt-1">{formatEntityName(event.entityType)}</p>
                   </td>
                   <td className="px-4 py-4 text-slate-600">
                     <p>{event.summary}</p>
