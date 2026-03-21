@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { DefaultSession, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
+import { logError, logInfo } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { assertRateLimit, getClientIdentifierFromRequestLike } from "@/lib/security";
@@ -49,18 +50,28 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, request) {
         const parsed = signInSchema.safeParse(credentials);
+        const requestId = request?.headers?.get?.("x-request-id") ?? crypto.randomUUID();
         if (!parsed.success) {
+          logInfo("auth.sign_in_validation_failed", { requestId });
           return null;
         }
 
         const { email, password } = parsed.data;
         const clientIp = getClientIdentifierFromRequestLike(request?.headers);
-        await assertRateLimit({
-          action: "auth:sign-in",
-          identifier: `${clientIp}:${email}`,
-          limit: 8,
-          windowMinutes: 10,
-        });
+        try {
+          await assertRateLimit({
+            action: "auth:sign-in",
+            identifier: `${clientIp}:${email}`,
+            limit: 8,
+            windowMinutes: 10,
+          });
+        } catch (error) {
+          logError("auth.sign_in_rate_limited", error, {
+            requestId,
+            emailDomain: email.split("@")[1] ?? "unknown",
+          });
+          throw error;
+        }
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -73,11 +84,21 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.passwordHash || !user.isActive) {
+          logInfo("auth.sign_in_rejected", {
+            requestId,
+            emailDomain: email.split("@")[1] ?? "unknown",
+            reason: "missing_user_or_inactive",
+          });
           return null;
         }
 
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid || user.memberships.length === 0) {
+          logInfo("auth.sign_in_rejected", {
+            requestId,
+            userId: user.id,
+            reason: !valid ? "invalid_password" : "missing_membership",
+          });
           return null;
         }
 
@@ -95,6 +116,12 @@ export const authOptions: NextAuthOptions = {
           data: {
             activeWorkspaceId: activeMembership.workspaceId,
           },
+        });
+
+        logInfo("auth.sign_in_succeeded", {
+          requestId,
+          userId: user.id,
+          workspaceId: activeMembership.workspaceId,
         });
 
         return {
@@ -193,6 +220,7 @@ export function auth() {
 export async function requireSession() {
   const session = await auth();
   if (!session?.user?.id || !session.user.workspaceId) {
+    logInfo("auth.require_session_failed");
     throw new Error("Unauthorized");
   }
 

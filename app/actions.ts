@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { setFlashMessage } from "@/lib/flash";
+import { getRequestLogContext, logError, logInfo } from "@/lib/logger";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import {
   applyImportJobRows,
@@ -416,6 +417,7 @@ export async function createInventoryItem(formData: FormData) {
 
 export async function signUpUser(formData: FormData) {
   try {
+    const logContext = await getRequestLogContext();
     const parsed = signUpSchema.safeParse({
       name: formData.get("name"),
       workspaceName: formData.get("workspaceName"),
@@ -425,6 +427,7 @@ export async function signUpUser(formData: FormData) {
     });
 
     if (!parsed.success) {
+      logInfo("auth.sign_up_validation_failed", logContext);
       await setFlashMessage({
         type: "error",
         title: "Check your sign-up details",
@@ -503,7 +506,13 @@ export async function signUpUser(formData: FormData) {
       title: "Account created",
       message: "Sign in with your new credentials to start adding your inventory.",
     });
+    logInfo("auth.sign_up_succeeded", {
+      ...logContext,
+      workspaceSlug,
+      emailDomain: email.split("@")[1] ?? "unknown",
+    });
   } catch (error) {
+    logError("auth.sign_up_failed", error, await getRequestLogContext());
     if (error instanceof RateLimitError) {
       await setFlashMessage({
         type: "error",
@@ -1341,6 +1350,7 @@ export async function createMaintenanceLog(formData: FormData) {
 
 export async function stageImportJob(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
   const entityType = importEntityValue(formData);
   const file = formData.get("file");
 
@@ -1393,11 +1403,18 @@ export async function stageImportJob(formData: FormData) {
     title: "Import staged",
     message: `${job.totalRows} row(s) staged for review before apply.`,
   });
+  logInfo("imports.stage_succeeded", {
+    ...logContext,
+    importJobId: job.id,
+    entityType,
+    totalRows: job.totalRows,
+  });
   revalidatePath("/imports");
 }
 
 export async function applyStagedImport(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
   const jobId = requiredString(formData, "jobId");
 
   const job = await applyImportJobRows(jobId, workspaceId);
@@ -1419,6 +1436,11 @@ export async function applyStagedImport(formData: FormData) {
     type: "success",
     title: "Import applied",
     message: `${job.entityType.toLowerCase().replace("_", " ")} records were written to inventory.`,
+  });
+  logInfo("imports.apply_succeeded", {
+    ...logContext,
+    importJobId: job.id,
+    entityType: job.entityType,
   });
   revalidateInventory();
 }
@@ -1511,6 +1533,7 @@ export async function updateImportRowDecision(formData: FormData) {
 
 export async function updateImportRowResolution(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
   const rowId = requiredString(formData, "rowId");
   const resolution = requiredString(formData, "resolution");
 
@@ -1593,6 +1616,12 @@ export async function updateImportRowResolution(formData: FormData) {
         : resolution === "UPDATE_MATCH"
           ? "This row is set to update the suggested match."
           : "This row is set to create a new record.",
+  });
+  logInfo("imports.row_resolution_updated", {
+    ...logContext,
+    rowId,
+    resolution,
+    importJobId: row.importJobId,
   });
   revalidatePath("/imports");
 }

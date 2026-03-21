@@ -105,6 +105,41 @@ docker compose down -v
 - The automatic local schema reset is Docker-dev-only and is enabled by `PRISMA_DEV_RESET_ON_P3005=true` in `docker-compose.yml`.
 - PostgreSQL is only exposed inside the Docker network. The app container connects internally on `db:5432`, and no host DB port is published.
 
+## Operations
+
+- Health endpoint:
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+- Protected requests receive an `x-request-id` header so logs can be correlated back to a specific request during troubleshooting.
+- Auth and import workflows emit structured JSON logs for production-friendly ingestion.
+
+### Backup Guidance
+
+Create a logical PostgreSQL backup from the Docker database container:
+
+```bash
+mkdir -p backups
+docker compose exec -T db pg_dump -U postgres -d makerventory --clean --if-exists > backups/makerventory-$(date +%F-%H%M%S).sql
+```
+
+### Restore Validation
+
+Validate a backup by restoring it into a temporary database inside the Postgres container:
+
+```bash
+docker compose exec -T db createdb -U postgres makerventory_restore_check
+docker compose exec -T db psql -U postgres -d makerventory_restore_check < backups/<backup-file>.sql
+docker compose exec -T db psql -U postgres -d makerventory_restore_check -c "SELECT COUNT(*) FROM \"Workspace\";"
+docker compose exec -T db dropdb -U postgres makerventory_restore_check
+```
+
+- Run restore validation regularly, not only after incidents.
+- Keep backup files outside the repo and store them securely.
+- Treat backup artifacts as sensitive because they can contain user, workspace, and inventory data.
+
 ## Prisma Workflow
 
 - Generate Prisma Client:
