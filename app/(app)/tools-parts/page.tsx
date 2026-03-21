@@ -31,11 +31,21 @@ export default async function ToolsPartsPage(props: { searchParams?: SearchParam
       <QuickAddShell title="Add tool or part" description="Track supporting hardware, fasteners, and project parts.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="tool" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="category" placeholder="Category" required />
-          <Input name="quantity" type="number" placeholder="Quantity" defaultValue="1" required />
-          <Input name="storageLocation" placeholder="Storage location" />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="M3 Socket Head Screws" required />
+          </LabeledField>
+          <LabeledField label="Category">
+            <Input name="category" placeholder="Hardware" required />
+          </LabeledField>
+          <LabeledField label="Quantity">
+            <Input name="quantity" type="number" placeholder="1" defaultValue="1" required />
+          </LabeledField>
+          <LabeledField label="Storage location">
+            <Input name="storageLocation" placeholder="Drawer 4" />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Sizes, project use, or organization notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add tool / part</SubmitButton></div>
         </form>
       </QuickAddShell>

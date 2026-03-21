@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { getPrinterBySlug } from "@/lib/data";
+import { formatBuildPlateSize, formatMaterialSystemType } from "@/lib/utils";
 
 export default async function PrinterDetailPage({
   params,
@@ -19,9 +20,17 @@ export default async function PrinterDetailPage({
   return (
     <div className="space-y-5">
       <div className="rounded-[32px] border border-slate-200 bg-white p-6 lg:p-8">
-        <Link href="/printers" className="text-sm text-slate-500 hover:text-slate-950">
-          Back to printers
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/printers" className="text-sm text-slate-500 hover:text-slate-950">
+            Back to printers
+          </Link>
+          <Link
+            href={`/printers?selected=${printer.id}`}
+            className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+          >
+            Manage setup
+          </Link>
+        </div>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
@@ -39,48 +48,78 @@ export default async function PrinterDetailPage({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <SectionCard title="Core printer info" description="Installed hardware, location, and linked controls.">
+        <SectionCard title="Overview" description="Current workshop state for this printer, with setup management grouped in one predictable place.">
           <div className="grid gap-4 md:grid-cols-2">
             <Info label="Brand / model" value={`${printer.brand} ${printer.model}`} />
             <Info label="Build volume" value={`${printer.buildVolumeX} x ${printer.buildVolumeY} x ${printer.buildVolumeZ} mm`} />
             <Info label="Location" value={printer.location ?? "Unset"} />
+            <Info label="Setup gaps" value={printer.installedHotend && printer.installedPlate ? "Fully configured" : "Needs hardware assignment"} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Current assignments" description="Installed hardware and linked controls are shown together so setup state reads clearly at a glance.">
+          <div className="grid gap-4 md:grid-cols-2">
             <Info label="Smart plug" value={printer.smartPlug?.name ?? "Not assigned"} />
-            <Info label="Installed nozzle" value={printer.installedHotend?.name ?? "Not assigned"} />
-            <Info label="Installed plate" value={printer.installedPlate?.name ?? "Not assigned"} />
+            <Info label="Installed hotend" value={printer.installedHotend?.name ?? "Not assigned"} />
+            <Info
+              label="Installed build plate"
+              value={
+                printer.installedPlate
+                  ? `${printer.installedPlate.name} · ${formatBuildPlateSize(printer.installedPlate.sizeMm)}`
+                  : "Not assigned"
+              }
+            />
             <Info
               label="Linked material systems"
-              value={printer.materialSystems.map((system) => system.name).join(", ") || "No linked systems"}
+              value={
+                printer.materialSystems.map((system) => `${system.name} (${formatMaterialSystemType(system.type)})`).join(", ") ||
+                "No linked systems"
+              }
             />
           </div>
         </SectionCard>
 
         <SectionCard title="Maintenance history" description="Recent work performed on this machine.">
           <div className="space-y-3">
-            {printer.maintenanceLogs.map((log) => (
-              <div key={log.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium text-slate-950">{log.actionPerformed}</p>
-                  <StatusBadge value={log.actionType} />
+            {printer.maintenanceLogs.length > 0 ? (
+              printer.maintenanceLogs.map((log) => (
+                <div key={log.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-slate-950">{log.actionPerformed}</p>
+                    <StatusBadge value={log.actionType} />
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {new Date(log.date).toLocaleDateString()}
+                  </p>
+                  {log.notes ? <p className="mt-2 text-sm leading-6 text-slate-600">{log.notes}</p> : null}
                 </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  {new Date(log.date).toLocaleDateString()}
-                </p>
-                {log.notes ? <p className="mt-2 text-sm leading-6 text-slate-600">{log.notes}</p> : null}
+              ))
+            ) : (
+              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+                No maintenance has been logged for this printer yet.
               </div>
-            ))}
+            )}
           </div>
         </SectionCard>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <SectionCard title="Compatible plates" description="Valid build plates for this machine.">
-          <List values={printer.compatiblePlates.map((item) => item.buildPlate.name)} />
+        <SectionCard title="Compatible build plates" description="Only plates configured for this printer appear here.">
+          <List
+            values={printer.compatiblePlates.map(
+              (item) => `${item.buildPlate.name} · ${formatBuildPlateSize(item.buildPlate.sizeMm)}`,
+            )}
+          />
         </SectionCard>
         <SectionCard title="Compatible hotends" description="Hotends safe to install on this machine.">
           <List values={printer.compatibleHotends.map((item) => item.hotend.name)} />
         </SectionCard>
         <SectionCard title="Compatible material systems" description="Linked and supported material flow hardware.">
-          <List values={printer.compatibleMaterialSystems.map((item) => item.materialSystem.name)} />
+          <List
+            values={printer.compatibleMaterialSystems.map(
+              (item) => `${item.materialSystem.name} (${formatMaterialSystemType(item.materialSystem.type)})`,
+            )}
+          />
         </SectionCard>
       </div>
     </div>
@@ -99,11 +138,17 @@ function Info({ label, value }: { label: string; value: string }) {
 function List({ values }: { values: string[] }) {
   return (
     <div className="space-y-3">
-      {values.map((value) => (
-        <div key={value} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          {value}
+      {values.length > 0 ? (
+        values.map((value) => (
+          <div key={value} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            {value}
+          </div>
+        ))
+      ) : (
+        <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+          Nothing has been configured here yet.
         </div>
-      ))}
+      )}
     </div>
   );
 }

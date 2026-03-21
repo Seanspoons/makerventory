@@ -29,11 +29,22 @@ export default async function SmartPlugsPage(props: { searchParams?: SearchParam
       <QuickAddShell title="Add smart plug" description="Create a smart plug record for a printer, dryer, or environmental accessory.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="smart-plug" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="assignedDeviceLabel" placeholder="Assigned device label" />
-          <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="powerMonitoringCapable" className="rounded" /> Power monitoring capable</label>
+          <LabeledField label="Name">
+            <Input name="name" placeholder="Printer Bench Plug" required />
+          </LabeledField>
+          <LabeledField label="Assigned device">
+            <Input name="assignedDeviceLabel" placeholder="A1 Mini" />
+          </LabeledField>
+          <LabeledField label="Capabilities">
+            <label className="flex min-h-[42px] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700">
+              <input type="checkbox" name="powerMonitoringCapable" className="rounded" />
+              Power monitoring capable
+            </label>
+          </LabeledField>
           <div />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Control grouping or automation notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add smart plug</SubmitButton></div>
         </form>
       </QuickAddShell>

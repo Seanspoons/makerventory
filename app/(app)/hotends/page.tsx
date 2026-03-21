@@ -42,11 +42,21 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
       <QuickAddShell title="Add hotend" description="Record a new nozzle or hotend as soon as it joins the spare parts inventory.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="hotend" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="materialType" placeholder="Material type" required />
-          <Input name="nozzleSize" placeholder="Nozzle size" type="number" step="0.1" required />
-          <Input name="quantity" placeholder="Quantity" type="number" defaultValue="1" required />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="P2S 0.4 mm Hardened Steel" required />
+          </LabeledField>
+          <LabeledField label="Material type">
+            <Input name="materialType" placeholder="Hardened Steel" required />
+          </LabeledField>
+          <LabeledField label="Nozzle size">
+            <Input name="nozzleSize" placeholder="0.4" type="number" step="0.1" required />
+          </LabeledField>
+          <LabeledField label="Quantity">
+            <Input name="quantity" placeholder="1" type="number" defaultValue="1" required />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Material handling or stock notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add hotend</SubmitButton></div>
         </form>
       </QuickAddShell>
@@ -119,7 +129,7 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <EditDialog title={`Edit ${detail.name}`} description="Update nozzle sizing, stock counts, and status.">
+                  <EditDialog title={`Edit ${detail.name}`} description="Update nozzle sizing, total stock, and installed assignment.">
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="hotend" />
                       <input type="hidden" name="id" value={detail.id} />

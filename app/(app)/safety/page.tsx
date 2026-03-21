@@ -37,10 +37,18 @@ export default async function SafetyPage(props: { searchParams?: SearchParams })
       <QuickAddShell title="Add safety item" description="Track a new purifier, exhaust component, or workshop safety asset.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="safety" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="type" placeholder="Type" required />
-          <Input name="replacementSchedule" placeholder="Replacement schedule" />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="Levoit Core 300-P" required />
+          </LabeledField>
+          <LabeledField label="Type">
+            <Input name="type" placeholder="Air purifier" required />
+          </LabeledField>
+          <LabeledField label="Replacement schedule">
+            <Input name="replacementSchedule" placeholder="Every 6 months" />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Filter, exhaust, or safety notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add safety item</SubmitButton></div>
         </form>
       </QuickAddShell>

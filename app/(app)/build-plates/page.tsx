@@ -38,10 +38,18 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
       <QuickAddShell title="Add build plate" description="Add a new build plate with its size family and surface information.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="build-plate" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="surfaceType" placeholder="Surface type" required />
-          <Input name="sizeMm" placeholder="Size mm" type="number" required />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="Textured Build Plate 256 mm" required />
+          </LabeledField>
+          <LabeledField label="Surface type">
+            <Input name="surfaceType" placeholder="Textured" required />
+          </LabeledField>
+          <LabeledField label="Size mm">
+            <Input name="sizeMm" placeholder="256" type="number" required />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Compatibility or wear notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add build plate</SubmitButton></div>
         </form>
       </QuickAddShell>

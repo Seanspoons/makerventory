@@ -40,15 +40,23 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
       <QuickAddShell title="Add material system" description="Record a new AMS unit or dryer for compatibility and assignment planning.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="material-system" />
-          <Input name="name" placeholder="Name" required />
-          <Select name="type" defaultValue="DRYER">
-            <option value="AMS_LITE">AMS Lite</option>
-            <option value="AMS_2_PRO">AMS 2 Pro</option>
-            <option value="AMS_HT">AMS HT</option>
-            <option value="DRYER">Dryer</option>
-          </Select>
-          <Textarea name="supportedMaterialsNotes" placeholder="Supported materials notes" className="lg:col-span-2" />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="Bambu Lab AMS Lite" required />
+          </LabeledField>
+          <LabeledField label="Type">
+            <Select name="type" defaultValue="DRYER">
+              <option value="AMS_LITE">AMS Lite</option>
+              <option value="AMS_2_PRO">AMS 2 Pro</option>
+              <option value="AMS_HT">AMS HT</option>
+              <option value="DRYER">Dryer</option>
+            </Select>
+          </LabeledField>
+          <LabeledField label="Supported materials notes" className="lg:col-span-2">
+            <Textarea name="supportedMaterialsNotes" placeholder="PLA, PETG, and dryer handling notes" />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Placement or operating notes" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add material system</SubmitButton></div>
         </form>
       </QuickAddShell>
