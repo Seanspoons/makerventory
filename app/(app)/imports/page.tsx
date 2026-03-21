@@ -61,6 +61,15 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           title="Stage CSV import"
           description="Upload a narrow CSV, review the staged rows, then apply it. This keeps real data onboarding deliberate instead of dumping seed-style demo records straight into production tables."
         >
+          <div className="mb-5 flex flex-wrap gap-2">
+            {importEntityOptions.map((option) => (
+              <Button key={option.value} asChild variant="secondary" size="sm">
+                <Link href={`/api/import-templates/${option.value.toLowerCase()}`}>
+                  Download {option.label} template
+                </Link>
+              </Button>
+            ))}
+          </div>
           <form action={stageImportJob} className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm text-slate-500">Entity type</label>
