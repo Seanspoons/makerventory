@@ -139,87 +139,89 @@ export function NotesImportPanel({
             const entityLabel = titleCase(group.entityType ?? undefined);
 
             return (
-            <div key={group.sourceName} className="rounded-[24px] border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <label className="mt-1 flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selectedGroups[group.groupKey])}
-                      onChange={(event) =>
-                        setSelectedGroups((current) => ({
-                          ...current,
-                          [group.groupKey]: event.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                  </label>
-                  <div>
-                    <p className="font-medium text-slate-950">{group.sectionLabel}</p>
-                    <p className="mt-1 text-sm text-slate-500">{entityLabel}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge value={group.readyRows > 0 ? "NEW" : "SKIPPED"} />
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                    {group.totalRows} rows
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Ready</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-950">{group.readyRows}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Blocked</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-950">{group.blockedRows}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Type</p>
-                  <p className="mt-2 text-sm font-medium text-slate-950">{entityLabel}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {group.rows.slice(0, 4).map((row) => (
-                  <div
-                    key={`${group.groupKey}-${row.rowIndex}`}
-                    className={cn(
-                      "rounded-2xl border p-3",
-                      row.status === "ERROR" || row.status === "CONFLICT"
-                        ? "border-rose-200 bg-rose-50/70"
-                        : "border-slate-200 bg-slate-50/70",
-                    )}
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {row.suggestedMatchSlug ? `Suggested match: ${row.suggestedMatchSlug}` : "New record candidate"}
-                        </p>
-                      </div>
-                      <StatusBadge value={row.status} />
+              <div key={group.sourceName} className="rounded-[24px] border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <label className="mt-1 flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selectedGroups[group.groupKey])}
+                        onChange={(event) =>
+                          setSelectedGroups((current) => ({
+                            ...current,
+                            [group.groupKey]: event.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </label>
+                    <div>
+                      <p className="font-medium text-slate-950">{group.sectionLabel}</p>
+                      <p className="mt-1 text-sm text-slate-500">{entityLabel}</p>
                     </div>
-                    {row.validationErrors.length > 0 ? (
-                      <div className="mt-3 text-sm text-rose-800">
-                        {row.validationErrors.join(" · ")}
-                      </div>
-                    ) : null}
-                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                      {JSON.stringify(row.data, null, 2)}
-                    </pre>
                   </div>
-                ))}
-                {group.rows.length > 4 ? (
-                  <p className="text-sm text-slate-500">
-                    Showing 4 of {group.rows.length} rows in preview. Full control is available after staging.
-                  </p>
-                ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge value={group.readyRows > 0 ? "NEW" : "SKIPPED"} />
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                      {group.totalRows} rows
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Ready</p>
+                    <p className="mt-2 text-xl font-semibold text-slate-950">{group.readyRows}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Blocked</p>
+                    <p className="mt-2 text-xl font-semibold text-slate-950">{group.blockedRows}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Type</p>
+                    <p className="mt-2 text-sm font-medium text-slate-950">{entityLabel}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {group.rows.slice(0, 4).map((row) => (
+                    <div
+                      key={`${group.groupKey}-${row.rowIndex}`}
+                      className={cn(
+                        "rounded-2xl border p-3",
+                        row.status === "ERROR" || row.status === "CONFLICT"
+                          ? "border-rose-200 bg-rose-50/70"
+                          : "border-slate-200 bg-slate-50/70",
+                      )}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {row.suggestedMatchSlug
+                              ? `Suggested match: ${row.suggestedMatchSlug}`
+                              : "New record candidate"}
+                          </p>
+                        </div>
+                        <StatusBadge value={row.status} />
+                      </div>
+                      {row.validationErrors.length > 0 ? (
+                        <div className="mt-3 text-sm text-rose-800">
+                          {row.validationErrors.join(" · ")}
+                        </div>
+                      ) : null}
+                      <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                        {JSON.stringify(row.data, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                  {group.rows.length > 4 ? (
+                    <p className="text-sm text-slate-500">
+                      Showing 4 of {group.rows.length} rows in preview. Full control is available after staging.
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            </div>
             );
           })}
         </div>

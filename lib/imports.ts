@@ -1,5 +1,6 @@
 import {
   FilamentHygroscopicLevel,
+  ImportEntityType as PrismaImportEntityType,
   ImportJobStatus,
   ImportRowStatus,
   MaterialSystemStatus,
@@ -57,6 +58,10 @@ const IMPORT_ENTITY_TYPES = {
 } as const satisfies Record<ImportEntityType, ImportEntityType>;
 type ImportRowResolutionValue =
   (typeof IMPORT_ROW_RESOLUTIONS)[keyof typeof IMPORT_ROW_RESOLUTIONS];
+
+function toPrismaImportEntityType(value: ImportEntityType) {
+  return PrismaImportEntityType[value];
+}
 
 export const importEntityOptions = [
   {
@@ -1394,12 +1399,13 @@ export async function createImportJobWithRows(args: {
   rows: StagedRow[];
 }) {
   const summary = summarize(args.rows);
+  const prismaEntityType = toPrismaImportEntityType(args.entityType);
 
   return prisma.importJob.create({
     data: {
       workspaceId: args.workspaceId,
       createdByUserId: args.userId,
-      entityType: args.entityType,
+      entityType: prismaEntityType,
       status: ImportJobStatus.STAGED,
       sourceName: args.sourceName,
       originalFilename: args.originalFilename,
@@ -1413,7 +1419,7 @@ export async function createImportJobWithRows(args: {
         create: args.rows.map((row) => ({
           workspaceId: args.workspaceId,
           rowIndex: row.rowIndex,
-          entityType: args.entityType,
+          entityType: prismaEntityType,
           status: row.status,
           resolution: row.resolution,
           fingerprint: row.fingerprint,
