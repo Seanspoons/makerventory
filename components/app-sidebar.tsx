@@ -20,7 +20,7 @@ export function AppSidebar({
   return (
     <aside className="sidebar-scroll h-full overflow-y-auto rounded-[30px] border border-slate-200/80 bg-slate-950 px-4 py-5 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-5 sm:py-6">
       <div className="flex items-center gap-3 border-b border-white/10 pb-5">
-        <BrandLockup theme="light" size="compact" subtitle="Workshop Operations" />
+        <BrandLockup theme="light" size="compact" subtitle="Workshop Control Center" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
@@ -72,14 +72,13 @@ export function AppSidebar({
         ))}
       </nav>
 
-      <div className="mt-8 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-emerald-200">
+      <div className="mt-8 rounded-[26px] border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
           <Sparkles className="h-4 w-4" />
-          Future-ready workshop
+          Daily focus
         </div>
-        <p className="mt-2 text-sm leading-6 text-emerald-50/80">
-          Structured for telemetry, QR labels, smart-plug automation, and spool
-          consumption tracking.
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Start in Control Center for attention items and next steps, then move into inventory, operations, or planning when you need detail.
         </p>
       </div>
 

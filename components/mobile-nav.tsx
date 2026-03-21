@@ -40,7 +40,7 @@ export function MobileNav({
             <div className="rounded-[28px] bg-slate-950 p-5 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Navigation</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Workspace</p>
                   <p className="mt-2 truncate text-sm text-slate-300">{userEmail}</p>
                 </div>
                 <DialogClose className="rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-white">
