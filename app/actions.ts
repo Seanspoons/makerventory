@@ -1418,13 +1418,23 @@ export async function stageInventoryNotesImport(formData: FormData) {
   const logContext = await getRequestLogContext({ userId, workspaceId });
   const notesText = requiredString(formData, "notesText");
   const sourceLabel = optionalString(formData, "sourceName") ?? "Notes paste";
+  const selectedGroupKeys = formData
+    .getAll("selectedGroupKey")
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 
-  const groups = parseInventoryNotes(notesText);
+  const allGroups = parseInventoryNotes(notesText);
+  const groups =
+    selectedGroupKeys.length > 0
+      ? allGroups.filter((group) => selectedGroupKeys.includes(group.groupKey))
+      : allGroups;
   if (groups.length === 0) {
     await setFlashMessage({
       type: "error",
       title: "Nothing to stage",
-      message: "No supported inventory sections were found in the pasted notes.",
+      message:
+        selectedGroupKeys.length > 0
+          ? "No selected sections were available to stage."
+          : "No supported inventory sections were found in the pasted notes.",
     });
     revalidatePath("/imports");
     return;
@@ -1437,7 +1447,7 @@ export async function stageInventoryNotesImport(formData: FormData) {
       workspaceId,
       userId,
       entityType: group.entityType,
-      sourceName: `${sourceLabel} · ${group.sourceName}`,
+      sourceName: `${sourceLabel} · ${group.sectionLabel}`,
       originalFilename: "notes-paste.txt",
       notes: "Staged from pasted inventory notes.",
       rows,
@@ -1454,6 +1464,7 @@ export async function stageInventoryNotesImport(formData: FormData) {
       summary: `Staged ${job.totalRows} row(s) from pasted notes for ${group.entityType.toLowerCase().replaceAll("_", " ")}.`,
       metadata: {
         source: "notes-paste",
+        sectionLabel: group.sectionLabel,
         totalRows: job.totalRows,
       },
     });

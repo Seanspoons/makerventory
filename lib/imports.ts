@@ -211,7 +211,9 @@ export const importFieldConfigs = {
 export type ImportFieldConfig = (typeof importFieldConfigs)[ImportEntityType][number];
 export type ImportFieldMapping = Record<string, string>;
 export type NotesImportGroup = {
+  groupKey: string;
   entityType: ImportEntityType;
+  sectionLabel: string;
   sourceName: string;
   records: Record<string, string>[];
 };
@@ -423,6 +425,10 @@ function extractBracketNote(value: string) {
   };
 }
 
+function cleanNotesLine(value: string) {
+  return value.replace(/^[-*•]\s*/, "").trim();
+}
+
 function extractQuantity(value: string) {
   const parenMatch = value.match(/\(x(\d+)\)\s*$/i);
   if (parenMatch) {
@@ -521,7 +527,7 @@ function inferHotendRecord(line: string) {
 }
 
 function inferFilamentRecord(line: string) {
-  const { text: noNote, note } = extractBracketNote(line);
+  const { text: noNote, note } = extractBracketNote(cleanNotesLine(line));
   const { text, quantity } = extractQuantity(noNote);
   const brand = inferBrand(text);
   const remainder = text.replace(`${brand} `, "").trim();
@@ -536,7 +542,7 @@ function inferFilamentRecord(line: string) {
   ];
   const matched = patterns.find((pattern) => remainder.includes(pattern.token)) ?? patterns[3];
   const [before, after = ""] = remainder.split(matched.token);
-  const finishTokens = ["Matte", "Silk", "Meta", "Metal"];
+  const finishTokens = ["Matte", "Silk", "Meta", "Metal", "Metallic"];
   const subtype = matched.subtype ?? (after.trim() || null);
   const finish = finishTokens.find((token) => before.includes(token) || after.includes(token)) ?? null;
   const color = before.replace(/\b(Matte|Silk|Meta|Metal)\b/gi, "").trim() || remainder;
@@ -567,7 +573,7 @@ function inferFilamentRecord(line: string) {
 }
 
 function inferConsumableRecord(line: string, section: string) {
-  const { text: withoutNote, note } = extractBracketNote(line);
+  const { text: withoutNote, note } = extractBracketNote(cleanNotesLine(line));
   const { text, quantity } = extractQuantity(withoutNote);
   return {
     name: text,
@@ -581,7 +587,7 @@ function inferConsumableRecord(line: string, section: string) {
 }
 
 function inferSafetyRecord(line: string) {
-  const { text, note } = extractBracketNote(line);
+  const { text, note } = extractBracketNote(cleanNotesLine(line));
   const lower = text.toLowerCase();
   const type = lower.includes("filter")
     ? "Air Filter"
@@ -597,16 +603,17 @@ function inferSafetyRecord(line: string) {
 }
 
 function inferSmartPlugRecord(line: string) {
+  const cleaned = cleanNotesLine(line);
   return {
-    name: line.trim(),
-    assignedDeviceLabel: line.trim(),
+    name: cleaned,
+    assignedDeviceLabel: cleaned,
     status: "ONLINE",
     powerMonitoringCapable: "false",
   };
 }
 
 function inferToolRecord(line: string, section: string) {
-  const { text: withoutNote, note } = extractBracketNote(line);
+  const { text: withoutNote, note } = extractBracketNote(cleanNotesLine(line));
   const { text, quantity } = extractQuantity(withoutNote);
   return {
     name: text,
@@ -617,7 +624,7 @@ function inferToolRecord(line: string, section: string) {
 }
 
 function inferWishlistRecord(line: string, category: string) {
-  const cleaned = line.replace(/^-+\s*/, "").trim();
+  const cleaned = cleanNotesLine(line);
   const urlMatch = cleaned.match(/\((https?:\/\/[^)]+)\)\s*$/i);
   const name = cleaned.replace(/\s*\(https?:\/\/[^)]+\)\s*$/i, "").trim();
   let vendor = "";
@@ -646,11 +653,26 @@ export function parseInventoryNotes(text: string): NotesImportGroup[] {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const groups = new Map<ImportEntityType, Record<string, string>[]>();
-  const push = (entityType: ImportEntityType, record: Record<string, string>) => {
-    const items = groups.get(entityType) ?? [];
-    items.push(record);
-    groups.set(entityType, items);
+  const groups = new Map<string, NotesImportGroup>();
+  const push = (
+    entityType: ImportEntityType,
+    sectionLabel: string,
+    record: Record<string, string>,
+  ) => {
+    const groupKey = `${entityType}:${slugify(sectionLabel)}`;
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.records.push(record);
+      return;
+    }
+
+    groups.set(groupKey, {
+      groupKey,
+      entityType,
+      sectionLabel,
+      sourceName: `Notes paste ${sectionLabel}`,
+      records: [record],
+    });
   };
 
   let section: string | null = null;
@@ -660,9 +682,11 @@ export function parseInventoryNotes(text: string): NotesImportGroup[] {
     [
       "Printers",
       "Automatic Material System (AMS) / Dryers",
+      "Automatic Material System (AMS) / Dryers:",
       "Build Plates",
       "Hotends",
       "Filament",
+      "Filament:",
       "Consumables & Maintenance",
       "Safety & Air Quality",
       "Extra Structural Printer Components",
@@ -686,37 +710,29 @@ export function parseInventoryNotes(text: string): NotesImportGroup[] {
       } else if (section === "Wishlist" && line.endsWith(":")) {
         wishlistCategory = line.replace(/:$/, "");
       } else {
-        section = line;
+        section = line.replace(/:$/, "");
       }
       continue;
     }
 
     if (!section) continue;
 
-    if (section === "Printers") push(ImportEntityType.PRINTER, inferPrinterRecord(line));
-    else if (section === "Automatic Material System (AMS) / Dryers") push(ImportEntityType.MATERIAL_SYSTEM, inferMaterialSystemRecord(line));
-    else if (section === "Build Plates") push(ImportEntityType.BUILD_PLATE, inferBuildPlateRecord(line));
-    else if (section === "Hotends") push(ImportEntityType.HOTEND, inferHotendRecord(line));
-    else if (section === "Filament") push(ImportEntityType.FILAMENT, inferFilamentRecord(line));
-    else if (section === "Consumables & Maintenance") push(ImportEntityType.CONSUMABLE, inferConsumableRecord(line, section));
-    else if (section === "Safety & Air Quality") push(ImportEntityType.SAFETY, inferSafetyRecord(line));
-    else if (section === "Smart Plugs") push(ImportEntityType.SMART_PLUG, inferSmartPlugRecord(line));
+    if (section === "Printers") push(ImportEntityType.PRINTER, section, inferPrinterRecord(cleanNotesLine(line)));
+    else if (section === "Automatic Material System (AMS) / Dryers") push(ImportEntityType.MATERIAL_SYSTEM, section, inferMaterialSystemRecord(cleanNotesLine(line)));
+    else if (section === "Build Plates") push(ImportEntityType.BUILD_PLATE, section, inferBuildPlateRecord(cleanNotesLine(line)));
+    else if (section === "Hotends") push(ImportEntityType.HOTEND, section, inferHotendRecord(cleanNotesLine(line)));
+    else if (section === "Filament") push(ImportEntityType.FILAMENT, section, inferFilamentRecord(cleanNotesLine(line)));
+    else if (section === "Consumables & Maintenance") push(ImportEntityType.CONSUMABLE, section, inferConsumableRecord(line, section));
+    else if (section === "Safety & Air Quality") push(ImportEntityType.SAFETY, section, inferSafetyRecord(cleanNotesLine(line)));
+    else if (section === "Smart Plugs") push(ImportEntityType.SMART_PLUG, section, inferSmartPlugRecord(cleanNotesLine(line)));
     else if (section === "Extra Structural Printer Components" || section === "Related Tools and Parts") {
-      push(ImportEntityType.TOOL_PART, inferToolRecord(line, section));
+      push(ImportEntityType.TOOL_PART, section, inferToolRecord(line, section));
     } else if (section === "Wishlist" && wishlistCategory && line.startsWith("-")) {
-      push(ImportEntityType.WISHLIST, inferWishlistRecord(line, wishlistCategory));
+      push(ImportEntityType.WISHLIST, `Wishlist · ${wishlistCategory}`, inferWishlistRecord(line, wishlistCategory));
     }
   }
 
-  return Array.from(groups.entries()).map(([entityType, records]) => ({
-    entityType,
-    sourceName: `Notes paste ${titleLabel(entityType)}`,
-    records,
-  }));
-}
-
-function titleLabel(entityType: ImportEntityType) {
-  return entityType.toLowerCase().replaceAll("_", " ");
+  return Array.from(groups.values());
 }
 
 function finalizeRows(rows: StagedRow[]) {

@@ -24,7 +24,9 @@ export async function POST(request: Request) {
     groups.map(async (group) => {
       const rows = await stageImportRecords(session.user.workspaceId, group.entityType, group.records);
       return {
+        groupKey: group.groupKey,
         entityType: group.entityType,
+        sectionLabel: group.sectionLabel,
         sourceName: group.sourceName,
         totalRows: rows.length,
         readyRows: rows.filter((row) => row.status === "NEW" || row.status === "MATCHED").length,

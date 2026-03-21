@@ -18,7 +18,9 @@ type PreviewRow = {
 };
 
 type PreviewGroup = {
+  groupKey: string;
   entityType: ImportEntityType;
+  sectionLabel: string;
   sourceName: string;
   totalRows: number;
   readyRows: number;
@@ -34,6 +36,7 @@ export function NotesImportPanel({
   const [notesText, setNotesText] = useState("");
   const [sourceName, setSourceName] = useState("Apple Notes workshop inventory");
   const [preview, setPreview] = useState<PreviewGroup[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<Record<string, boolean>>({});
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewPending, startPreviewTransition] = useTransition();
 
@@ -57,11 +60,16 @@ export function NotesImportPanel({
 
       const payload = (await response.json()) as { groups: PreviewGroup[] };
       setPreview(payload.groups);
+      setSelectedGroups(
+        Object.fromEntries(payload.groups.map((group) => [group.groupKey, true])),
+      );
       if (payload.groups.length === 0) {
         setPreviewError("No supported inventory sections were detected in the pasted notes.");
       }
     });
   }
+
+  const selectedCount = preview.filter((group) => selectedGroups[group.groupKey]).length;
 
   return (
     <div className="space-y-4">
@@ -95,6 +103,11 @@ export function NotesImportPanel({
             Stage notes import
           </Button>
         </div>
+        {preview.map((group) =>
+          selectedGroups[group.groupKey] ? (
+            <input key={group.groupKey} type="hidden" name="selectedGroupKey" value={group.groupKey} />
+          ) : null,
+        )}
       </form>
 
       <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
@@ -117,14 +130,32 @@ export function NotesImportPanel({
             <p className="mt-2 text-sm text-slate-600">
               {preview.length} import group{preview.length === 1 ? "" : "s"} detected from the pasted notes.
             </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedCount} selected for staging.
+            </p>
           </div>
 
           {preview.map((group) => (
             <div key={group.sourceName} className="rounded-[24px] border border-slate-200 bg-white p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="font-medium text-slate-950">{group.sourceName}</p>
-                  <p className="mt-1 text-sm text-slate-500">{titleCase(group.entityType)}</p>
+                <div className="flex items-start gap-3">
+                  <label className="mt-1 flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedGroups[group.groupKey])}
+                      onChange={(event) =>
+                        setSelectedGroups((current) => ({
+                          ...current,
+                          [group.groupKey]: event.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                  </label>
+                  <div>
+                    <p className="font-medium text-slate-950">{group.sectionLabel}</p>
+                    <p className="mt-1 text-sm text-slate-500">{titleCase(group.entityType)}</p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={group.readyRows > 0 ? "NEW" : "SKIPPED"} />
@@ -152,7 +183,7 @@ export function NotesImportPanel({
               <div className="mt-4 space-y-3">
                 {group.rows.slice(0, 4).map((row) => (
                   <div
-                    key={`${group.sourceName}-${row.rowIndex}`}
+                    key={`${group.groupKey}-${row.rowIndex}`}
                     className={cn(
                       "rounded-2xl border p-3",
                       row.status === "ERROR" || row.status === "CONFLICT"
