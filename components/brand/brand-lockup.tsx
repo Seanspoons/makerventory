@@ -23,7 +23,7 @@ export function BrandLockup({
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <div
         className={cn(
-          "flex items-center justify-center rounded-2xl p-2.5 shadow-[0_4px_4px_rgba(0,0,0,0.25)]",
+          "shrink-0 flex items-center justify-center rounded-2xl p-2.5 shadow-[0_4px_4px_rgba(0,0,0,0.25)]",
           darkTheme ? "bg-slate-950" : "bg-white/10",
           size === "compact" ? "h-12 w-12" : "h-14 w-14",
         )}
@@ -31,9 +31,9 @@ export function BrandLockup({
         <Image
           src="/brand/makerventory-mark-light.svg"
           alt="Makerventory mark"
-          width={size === "compact" ? 28 : 34}
-          height={size === "compact" ? 28 : 34}
-          className={cn(size === "compact" ? "h-7 w-7" : "h-8.5 w-8.5", wordmarkShadow)}
+          width={size === "compact" ? 32 : 38}
+          height={size === "compact" ? 32 : 38}
+          className={cn(size === "compact" ? "h-8 w-8" : "h-9.5 w-9.5", wordmarkShadow)}
           priority
         />
       </div>
