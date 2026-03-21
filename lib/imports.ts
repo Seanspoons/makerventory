@@ -1,6 +1,6 @@
 import {
+  $Enums,
   FilamentHygroscopicLevel,
-  ImportEntityType as PrismaImportEntityType,
   ImportJobStatus,
   ImportRowStatus,
   MaterialSystemStatus,
@@ -60,7 +60,7 @@ type ImportRowResolutionValue =
   (typeof IMPORT_ROW_RESOLUTIONS)[keyof typeof IMPORT_ROW_RESOLUTIONS];
 
 function toPrismaImportEntityType(value: ImportEntityType) {
-  return PrismaImportEntityType[value];
+  return $Enums.ImportEntityType[value];
 }
 
 export const importEntityOptions = [
