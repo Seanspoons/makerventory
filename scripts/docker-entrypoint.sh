@@ -10,8 +10,8 @@ node ./scripts/wait-for-postgres.mjs
 echo "Generating Prisma Client..."
 npm run db:generate
 
-echo "Applying Prisma schema..."
-npm run db:push
+echo "Applying Prisma migrations..."
+npm run db:deploy
 
 if [ "${SEED_ON_START:-true}" = "true" ]; then
   echo "Checking seed state..."

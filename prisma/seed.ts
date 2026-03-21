@@ -12,7 +12,9 @@ import {
   WishlistStatus,
   BuildPlateStatus,
   HotendStatus,
+  WorkspaceRole,
 } from "@prisma/client";
+import { hashPassword } from "@/lib/password";
 
 const prisma = new PrismaClient();
 
@@ -40,10 +42,52 @@ async function main() {
   await prisma.smartPlug.deleteMany();
   await prisma.toolPart.deleteMany();
   await prisma.wishlistItem.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.workspaceMember.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.workspace.deleteMany();
+
+  const workspace = await prisma.workspace.create({
+    data: {
+      name: process.env.BOOTSTRAP_WORKSPACE_NAME ?? "Makerventory Workshop",
+      slug: "makerventory-workshop",
+      description: "Primary Makerventory workspace",
+    },
+  });
+
+  const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD?.trim();
+  const bootstrapName = process.env.BOOTSTRAP_ADMIN_NAME?.trim() || "Makerventory Owner";
+
+  if (bootstrapEmail && bootstrapPassword) {
+    const passwordHash = await hashPassword(bootstrapPassword);
+    const owner = await prisma.user.create({
+      data: {
+        email: bootstrapEmail,
+        name: bootstrapName,
+        passwordHash,
+        activeWorkspaceId: workspace.id,
+      },
+    });
+
+    await prisma.workspaceMember.create({
+      data: {
+        userId: owner.id,
+        workspaceId: workspace.id,
+        role: WorkspaceRole.OWNER,
+      },
+    });
+  } else {
+    console.warn(
+      "No bootstrap admin credentials were provided. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD to create a login.",
+    );
+  }
 
   const smartPlugs = await Promise.all([
     prisma.smartPlug.create({
       data: {
+        workspaceId: workspace.id,
         name: "A1 Mini",
         slug: "smart-plug-a1-mini",
         assignedDeviceLabel: "Bambu Lab A1 Mini",
@@ -54,6 +98,7 @@ async function main() {
     }),
     prisma.smartPlug.create({
       data: {
+        workspaceId: workspace.id,
         name: "P2S",
         slug: "smart-plug-p2s",
         assignedDeviceLabel: "Bambu Lab P2S",
@@ -64,6 +109,7 @@ async function main() {
     }),
     prisma.smartPlug.create({
       data: {
+        workspaceId: workspace.id,
         name: "Air Purifier",
         slug: "smart-plug-air-purifier",
         assignedDeviceLabel: "Levoit Core 300-P",
@@ -73,6 +119,7 @@ async function main() {
     }),
     prisma.smartPlug.create({
       data: {
+        workspaceId: workspace.id,
         name: "Dryer",
         slug: "smart-plug-dryer",
         assignedDeviceLabel: "Creality Space Pi Filament Dryer Plus",
@@ -86,6 +133,7 @@ async function main() {
   const hotends = await Promise.all([
     prisma.hotend.create({
       data: {
+        workspaceId: workspace.id,
         name: "A1 Mini 0.4mm Stainless",
         slug: "a1-mini-0-4mm-stainless",
         nozzleSize: 0.4,
@@ -99,6 +147,7 @@ async function main() {
     }),
     prisma.hotend.create({
       data: {
+        workspaceId: workspace.id,
         name: "A1 Mini 0.4mm Hardened Steel",
         slug: "a1-mini-0-4mm-hardened-steel",
         nozzleSize: 0.4,
@@ -112,6 +161,7 @@ async function main() {
     }),
     prisma.hotend.create({
       data: {
+        workspaceId: workspace.id,
         name: "P2S 0.4mm Hardened Steel",
         slug: "p2s-0-4mm-hardened-steel",
         nozzleSize: 0.4,
@@ -125,6 +175,7 @@ async function main() {
     }),
     prisma.hotend.create({
       data: {
+        workspaceId: workspace.id,
         name: "P2S 0.6mm Hardened Steel",
         slug: "p2s-0-6mm-hardened-steel",
         nozzleSize: 0.6,
@@ -141,6 +192,7 @@ async function main() {
   const plates = await Promise.all([
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Textured Build Plate 180mm",
         slug: "bambu-lab-textured-build-plate-180mm",
         sizeLabel: "180mm",
@@ -151,6 +203,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Smooth Build Plate 180mm",
         slug: "bambu-lab-smooth-build-plate-180mm",
         sizeLabel: "180mm",
@@ -162,6 +215,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Dual Textured/Smooth Build Plate 180mm",
         slug: "bambu-lab-dual-textured-smooth-build-plate-180mm",
         sizeLabel: "180mm",
@@ -172,6 +226,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Textured Build Plate 256mm",
         slug: "bambu-lab-textured-build-plate-256mm",
         sizeLabel: "256mm",
@@ -182,6 +237,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Engineering Plate 256mm",
         slug: "bambu-lab-engineering-plate-256mm",
         sizeLabel: "256mm",
@@ -192,6 +248,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Cool Plate SuperTack 256mm",
         slug: "bambu-lab-cool-plate-supertack-256mm",
         sizeLabel: "256mm",
@@ -203,6 +260,7 @@ async function main() {
     }),
     prisma.buildPlate.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab Dual Textured/Smooth Build Plate 256mm",
         slug: "bambu-lab-dual-textured-smooth-build-plate-256mm",
         sizeLabel: "256mm",
@@ -216,6 +274,7 @@ async function main() {
   const printers = await Promise.all([
     prisma.printer.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab A1 Mini",
         slug: "bambu-lab-a1-mini",
         brand: "Bambu Lab",
@@ -233,6 +292,7 @@ async function main() {
     }),
     prisma.printer.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab P2S",
         slug: "bambu-lab-p2s",
         brand: "Bambu Lab",
@@ -253,6 +313,7 @@ async function main() {
   const materialSystems = await Promise.all([
     prisma.materialSystem.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab AMS Lite",
         slug: "bambu-lab-ams-lite",
         type: MaterialSystemType.AMS_LITE,
@@ -264,6 +325,7 @@ async function main() {
     }),
     prisma.materialSystem.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab AMS 2 Pro",
         slug: "bambu-lab-ams-2-pro",
         type: MaterialSystemType.AMS_2_PRO,
@@ -275,6 +337,7 @@ async function main() {
     }),
     prisma.materialSystem.create({
       data: {
+        workspaceId: workspace.id,
         name: "Bambu Lab AMS HT",
         slug: "bambu-lab-ams-ht",
         type: MaterialSystemType.AMS_HT,
@@ -286,6 +349,7 @@ async function main() {
     }),
     prisma.materialSystem.create({
       data: {
+        workspaceId: workspace.id,
         name: "Creality Space Pi Filament Dryer Plus",
         slug: "creality-space-pi-filament-dryer-plus",
         type: MaterialSystemType.DRYER,
@@ -398,6 +462,7 @@ async function main() {
 
     await prisma.filamentSpool.create({
       data: {
+        workspaceId: workspace.id,
         brand,
         materialType,
         subtype,
@@ -458,6 +523,7 @@ async function main() {
   ].map(([name, category, quantity, unit, reorderThreshold, status, storageLocation, notes]) =>
     prisma.consumableItem.create({
       data: {
+        workspaceId: workspace.id,
         name: name as string,
         slug: slugify(name as string),
         category: category as string,
@@ -474,6 +540,7 @@ async function main() {
   const safetyEquipment = await Promise.all([
     prisma.safetyEquipment.create({
       data: {
+        workspaceId: workspace.id,
         name: "Levoit Core 300-P w/ Toxin Absorber Filter",
         slug: "levoit-core-300-p-toxin-absorber",
         type: "Air Purifier",
@@ -484,6 +551,7 @@ async function main() {
     }),
     prisma.safetyEquipment.create({
       data: {
+        workspaceId: workspace.id,
         name: "P2S External Exhaust Fan Kit (no filter or ducting yet)",
         slug: "p2s-external-exhaust-fan-kit",
         type: "Exhaust",
@@ -494,6 +562,7 @@ async function main() {
     }),
     prisma.safetyEquipment.create({
       data: {
+        workspaceId: workspace.id,
         name: "P2S Rear Panel",
         slug: "p2s-rear-panel",
         type: "Structural Component",
@@ -511,6 +580,7 @@ async function main() {
   ].map(([name, category, quantity, storageLocation, notes]) =>
     prisma.toolPart.create({
       data: {
+        workspaceId: workspace.id,
         name: name as string,
         slug: slugify(name as string),
         category: category as string,
@@ -534,6 +604,7 @@ async function main() {
   ].map(([name, category, priority, estimatedCost, vendor, purchaseUrl, notes, status]) =>
     prisma.wishlistItem.create({
       data: {
+        workspaceId: workspace.id,
         name: name as string,
         slug: slugify(name as string),
         category: category as string,
@@ -556,6 +627,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-18T10:15:00.000Z"),
       actionType: MaintenanceActionType.BED_CLEANING,
       actionPerformed: "Cleaned A1 Mini dual-sided build plate and re-leveled surface.",
@@ -578,6 +650,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-16T15:30:00.000Z"),
       actionType: MaintenanceActionType.NOZZLE_SWAP,
       actionPerformed: "Installed 0.4mm hardened steel hotend on A1 Mini.",
@@ -589,6 +662,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-14T19:40:00.000Z"),
       actionType: MaintenanceActionType.LUBRICATION,
       actionPerformed: "Lubricated P2S motion system and inspected belts.",
@@ -610,6 +684,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-13T17:00:00.000Z"),
       actionType: MaintenanceActionType.DESICCANT_REFRESH,
       actionPerformed: "Repacked AMS Lite desiccant bags with regenerated beads.",
@@ -631,6 +706,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-12T20:20:00.000Z"),
       actionType: MaintenanceActionType.WIPER_REPLACEMENT,
       actionPerformed: "Inspected P2S nozzle wiping pad and flagged reorder.",
@@ -652,6 +728,7 @@ async function main() {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId: workspace.id,
       date: new Date("2026-03-11T14:10:00.000Z"),
       actionType: MaintenanceActionType.EXHAUST_UPDATE,
       actionPerformed: "Test-fitted P2S exhaust fan kit and measured window route.",

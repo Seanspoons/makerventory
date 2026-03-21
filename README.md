@@ -38,16 +38,16 @@ Makerventory is designed as an internal-tool style SaaS dashboard rather than a 
 npm install
 ```
 
-2. Copy the environment file and point it at a PostgreSQL database:
+2. Copy the environment file and set a real auth secret plus bootstrap owner credentials:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Push the Prisma schema to your database:
+3. Apply the Prisma migrations to your database:
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
 4. Seed the database:
@@ -80,7 +80,7 @@ What happens on startup:
 - PostgreSQL starts in a dedicated container
 - the app waits for the database to become reachable
 - Prisma Client is generated
-- `prisma db push` applies the schema
+- `prisma migrate deploy` applies committed migrations
 - the seed runs only if the database is empty
 - Next.js starts in development mode with file watching enabled
 
@@ -110,7 +110,13 @@ docker compose down -v
 npm run db:generate
 ```
 
-- Push schema changes during development:
+- Apply committed migrations:
+
+```bash
+npm run db:deploy
+```
+
+- Push schema changes during development if you are intentionally doing non-migration prototyping:
 
 ```bash
 npm run db:push
@@ -176,3 +182,4 @@ docker compose config
 - The app uses a PostgreSQL datasource in Prisma as requested.
 - Pages are rendered dynamically so the dashboard and inventory views can read live operational data.
 - The UI is optimized primarily for desktop but remains responsive on smaller screens.
+- Authentication now expects a bootstrap owner account from environment variables during the first seed run.

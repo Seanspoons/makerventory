@@ -26,6 +26,12 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/makerventory
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: change-me-local-dev-secret
+      BOOTSTRAP_WORKSPACE_NAME: Makerventory Workshop
+      BOOTSTRAP_ADMIN_NAME: Workshop Owner
+      BOOTSTRAP_ADMIN_EMAIL: owner@example.com
+      BOOTSTRAP_ADMIN_PASSWORD: change-me-now
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
       SEED_ON_START: "true"
