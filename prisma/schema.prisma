@@ -124,6 +124,15 @@ enum ImportRowStatus {
   ERROR
 }
 
+enum AuditActionType {
+  CREATE
+  UPDATE
+  ARCHIVE
+  VOID
+  IMPORT_STAGE
+  IMPORT_APPLY
+}
+
 model User {
   id                String            @id @default(cuid())
   name              String?
@@ -138,6 +147,7 @@ model User {
   accounts          Account[]
   sessions          Session[]
   importJobs        ImportJob[]
+  auditEvents       AuditEvent[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -162,6 +172,7 @@ model Workspace {
   maintenanceLogs MaintenanceLog[]
   importJobs      ImportJob[]
   importRows      ImportRow[]
+  auditEvents     AuditEvent[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -257,6 +268,24 @@ model ImportRow {
 
   @@unique([importJobId, rowIndex])
   @@index([workspaceId, status])
+}
+
+model AuditEvent {
+  id          String          @id @default(cuid())
+  workspaceId String
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUserId String?
+  actorUser   User?           @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actionType  AuditActionType
+  entityType  String
+  entityId    String?
+  entityLabel String?
+  summary     String
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, actionType])
 }
 
 model Printer {
@@ -462,10 +491,12 @@ model ToolPart {
   storageLocation String?
   notes           String?   @db.Text
   imageUrl        String?
+  archivedAt      DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@unique([workspaceId, slug])
+  @@index([workspaceId, archivedAt])
 }
 
 model WishlistItem {
@@ -506,8 +537,12 @@ model MaintenanceLog {
   safetyEquipmentId String?
   safetyEquipment   SafetyEquipment?           @relation(fields: [safetyEquipmentId], references: [id])
   consumablesUsed   MaintenanceConsumableUsage[]
+  voidedAt          DateTime?
+  voidReason        String?                    @db.Text
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
+
+  @@index([workspaceId, voidedAt])
 }
 
 model MaintenanceConsumableUsage {

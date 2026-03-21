@@ -60,13 +60,14 @@ export async function getDashboardData() {
     prisma.maintenanceLog.count({
       where: {
         workspaceId,
+        voidedAt: null,
         date: {
           gte: subDays(new Date(), 30),
         },
       },
     }),
     prisma.maintenanceLog.findMany({
-      where: { workspaceId },
+      where: { workspaceId, voidedAt: null },
       orderBy: { date: "desc" },
       take: 6,
       include: {
@@ -98,7 +99,7 @@ export async function getDashboardData() {
     prisma.materialSystem.findMany({ where: { workspaceId } }),
     prisma.buildPlate.findMany({ where: { workspaceId } }),
     prisma.hotend.findMany({ where: { workspaceId } }),
-    prisma.toolPart.findMany({ where: { workspaceId } }),
+    prisma.toolPart.findMany({ where: { workspaceId, archivedAt: null } }),
     prisma.filamentSpool.groupBy({
       where: { workspaceId },
       by: ["materialType"],
@@ -163,6 +164,7 @@ export const printerDetailInclude = {
   compatibleHotends: { include: { hotend: true } },
   compatibleMaterialSystems: { include: { materialSystem: true } },
   maintenanceLogs: {
+    where: { voidedAt: null },
     orderBy: { date: "desc" as const },
     include: {
       consumablesUsed: { include: { consumableItem: true } },
@@ -192,6 +194,7 @@ export async function getPrinters() {
       installedPlate: true,
       materialSystems: true,
       maintenanceLogs: {
+        where: { voidedAt: null },
         orderBy: { date: "desc" },
         take: 3,
       },
@@ -207,7 +210,7 @@ export async function getMaterialSystems() {
     include: {
       assignedPrinter: true,
       compatiblePrinters: { include: { printer: true } },
-      maintenanceLogs: { orderBy: { date: "desc" }, take: 3 },
+      maintenanceLogs: { where: { voidedAt: null }, orderBy: { date: "desc" }, take: 3 },
     },
   });
 }
@@ -220,7 +223,7 @@ export async function getBuildPlates() {
     include: {
       installedOnPrinter: true,
       compatiblePrinters: { include: { printer: true } },
-      maintenanceLogs: { orderBy: { date: "desc" }, take: 3 },
+      maintenanceLogs: { where: { voidedAt: null }, orderBy: { date: "desc" }, take: 3 },
     },
   });
 }
@@ -233,7 +236,7 @@ export async function getHotends() {
     include: {
       installedOnPrinter: true,
       compatiblePrinters: { include: { printer: true } },
-      maintenanceLogs: { orderBy: { date: "desc" }, take: 3 },
+      maintenanceLogs: { where: { voidedAt: null }, orderBy: { date: "desc" }, take: 3 },
     },
   });
 }
@@ -263,7 +266,7 @@ export async function getSafetyEquipment() {
     where: { workspaceId },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     include: {
-      maintenanceLogs: { orderBy: { date: "desc" }, take: 3 },
+      maintenanceLogs: { where: { voidedAt: null }, orderBy: { date: "desc" }, take: 3 },
     },
   });
 }
@@ -282,7 +285,7 @@ export async function getSmartPlugs() {
 export async function getTools() {
   const workspaceId = await getWorkspaceId();
   return prisma.toolPart.findMany({
-    where: { workspaceId },
+    where: { workspaceId, archivedAt: null },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 }
@@ -298,7 +301,7 @@ export async function getWishlist() {
 export async function getMaintenanceLogs() {
   const workspaceId = await getWorkspaceId();
   return prisma.maintenanceLog.findMany({
-    where: { workspaceId },
+    where: { workspaceId, voidedAt: null },
     orderBy: { date: "desc" },
     include: {
       printer: true,
@@ -307,6 +310,23 @@ export async function getMaintenanceLogs() {
       hotend: true,
       safetyEquipment: true,
       consumablesUsed: { include: { consumableItem: true } },
+    },
+  });
+}
+
+export async function getAuditEvents() {
+  const workspaceId = await getWorkspaceId();
+  return prisma.auditEvent.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      actorUser: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 }

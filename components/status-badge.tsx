@@ -31,6 +31,12 @@ const palette: Record<string, string> = {
   MEDIUM: "bg-sky-50 text-sky-700 ring-sky-200",
   LOW_PRIORITY: "bg-slate-100 text-slate-600 ring-slate-200",
   PURCHASED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  CREATE: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  UPDATE: "bg-sky-50 text-sky-700 ring-sky-200",
+  ARCHIVE: "bg-slate-100 text-slate-600 ring-slate-200",
+  VOID: "bg-rose-50 text-rose-700 ring-rose-200",
+  IMPORT_STAGE: "bg-violet-50 text-violet-700 ring-violet-200",
+  IMPORT_APPLY: "bg-emerald-50 text-emerald-700 ring-emerald-200",
 };
 
 export function StatusBadge({ value }: { value: string }) {

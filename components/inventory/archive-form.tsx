@@ -14,7 +14,7 @@ export function ArchiveForm({
     <ConfirmActionForm
       action={archiveInventoryItem}
       title={`${label} record?`}
-      description="This change is persisted immediately. Use this for archiving, retiring, disabling, deleting, or marking the selected record as purchased."
+      description="This change is persisted immediately. Use this for archiving, retiring, disabling, voiding, or marking the selected record as purchased."
       confirmLabel={label}
       triggerLabel={label}
     >

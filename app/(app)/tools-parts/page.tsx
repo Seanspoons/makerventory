@@ -61,7 +61,7 @@ export default async function ToolsPartsPage(props: { searchParams?: SearchParam
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>
-                  <ArchiveForm id={item.id} kind="tool" label="Delete" />
+                  <ArchiveForm id={item.id} kind="tool" label="Archive" />
                 </div>
               </div>
             </div>

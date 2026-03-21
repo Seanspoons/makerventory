@@ -139,7 +139,7 @@ export default async function MaintenancePage(props: { searchParams?: SearchPara
                       </p>
                     ) : null}
                   </div>
-                  <ArchiveForm id={log.id} kind="maintenance" label="Delete log" />
+                  <ArchiveForm id={log.id} kind="maintenance" label="Void log" />
                 </div>
               </div>
             );

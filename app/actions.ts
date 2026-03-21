@@ -5,6 +5,7 @@ import {
   ImportEntityType,
   MaterialSystemType,
   MaintenanceActionType,
+  Prisma,
   StockStatus,
   WishlistPriority,
 } from "@prisma/client";
@@ -44,6 +45,7 @@ function revalidateInventory() {
   [
     "/",
     "/imports",
+    "/audit",
     "/printers",
     "/material-systems",
     "/build-plates",
@@ -80,6 +82,30 @@ async function getWorkspaceContext() {
   };
 }
 
+async function logAuditEvent(args: {
+  workspaceId: string;
+  userId?: string | null;
+  actionType: "CREATE" | "UPDATE" | "ARCHIVE" | "VOID" | "IMPORT_STAGE" | "IMPORT_APPLY";
+  entityType: string;
+  entityId?: string | null;
+  entityLabel?: string | null;
+  summary: string;
+  metadata?: Prisma.InputJsonValue;
+}) {
+  await prisma.auditEvent.create({
+    data: {
+      workspaceId: args.workspaceId,
+      actorUserId: args.userId ?? null,
+      actionType: args.actionType,
+      entityType: args.entityType,
+      entityId: args.entityId ?? null,
+      entityLabel: args.entityLabel ?? null,
+      summary: args.summary,
+      metadata: args.metadata,
+    },
+  });
+}
+
 async function assertOwnedRecord(kind: string, id: string, workspaceId: string) {
   switch (kind) {
     case "printer":
@@ -111,12 +137,14 @@ async function assertOwnedRecord(kind: string, id: string, workspaceId: string) 
 
 export async function createInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
+  let createdId: string | null = null;
+  let createdLabel: string | null = null;
 
   switch (kind) {
     case "printer": {
       const name = requiredString(formData, "name");
-      await prisma.printer.create({
+      const printer = await prisma.printer.create({
         data: {
           workspaceId,
           name,
@@ -130,11 +158,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = printer.id;
+      createdLabel = printer.name;
       break;
     }
     case "material-system": {
       const name = requiredString(formData, "name");
-      await prisma.materialSystem.create({
+      const materialSystem = await prisma.materialSystem.create({
         data: {
           workspaceId,
           name,
@@ -144,11 +174,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = materialSystem.id;
+      createdLabel = materialSystem.name;
       break;
     }
     case "build-plate": {
       const name = requiredString(formData, "name");
-      await prisma.buildPlate.create({
+      const buildPlate = await prisma.buildPlate.create({
         data: {
           workspaceId,
           name,
@@ -159,12 +191,14 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = buildPlate.id;
+      createdLabel = buildPlate.name;
       break;
     }
     case "hotend": {
       const name = requiredString(formData, "name");
       const quantity = numberValue(formData, "quantity", 1);
-      await prisma.hotend.create({
+      const hotend = await prisma.hotend.create({
         data: {
           workspaceId,
           name,
@@ -176,6 +210,8 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = hotend.id;
+      createdLabel = hotend.name;
       break;
     }
     case "filament": {
@@ -184,7 +220,7 @@ export async function createInventoryItem(formData: FormData) {
       const color = requiredString(formData, "color");
       const abrasive = formData.get("abrasive") === "on";
       const dryingRequired = formData.get("dryingRequired") === "on";
-      await prisma.filamentSpool.create({
+      const filament = await prisma.filamentSpool.create({
         data: {
           workspaceId,
           brand,
@@ -221,11 +257,13 @@ export async function createInventoryItem(formData: FormData) {
           },
         },
       });
+      createdId = filament.id;
+      createdLabel = `${filament.brand} ${filament.color} ${filament.materialType}`;
       break;
     }
     case "consumable": {
       const name = requiredString(formData, "name");
-      await prisma.consumableItem.create({
+      const consumable = await prisma.consumableItem.create({
         data: {
           workspaceId,
           name,
@@ -238,11 +276,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = consumable.id;
+      createdLabel = consumable.name;
       break;
     }
     case "safety": {
       const name = requiredString(formData, "name");
-      await prisma.safetyEquipment.create({
+      const safety = await prisma.safetyEquipment.create({
         data: {
           workspaceId,
           name,
@@ -252,11 +292,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = safety.id;
+      createdLabel = safety.name;
       break;
     }
     case "smart-plug": {
       const name = requiredString(formData, "name");
-      await prisma.smartPlug.create({
+      const smartPlug = await prisma.smartPlug.create({
         data: {
           workspaceId,
           name,
@@ -266,11 +308,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = smartPlug.id;
+      createdLabel = smartPlug.name;
       break;
     }
     case "tool": {
       const name = requiredString(formData, "name");
-      await prisma.toolPart.create({
+      const tool = await prisma.toolPart.create({
         data: {
           workspaceId,
           name,
@@ -281,11 +325,13 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = tool.id;
+      createdLabel = tool.name;
       break;
     }
     case "wishlist": {
       const name = requiredString(formData, "name");
-      await prisma.wishlistItem.create({
+      const wishlistItem = await prisma.wishlistItem.create({
         data: {
           workspaceId,
           name,
@@ -298,11 +344,23 @@ export async function createInventoryItem(formData: FormData) {
           notes: optionalString(formData, "notes"),
         },
       });
+      createdId = wishlistItem.id;
+      createdLabel = wishlistItem.name;
       break;
     }
     default:
       throw new Error(`Unsupported inventory kind: ${kind}`);
   }
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "CREATE",
+    entityType: kind,
+    entityId: createdId,
+    entityLabel: createdLabel,
+    summary: `Created ${kind} record${createdLabel ? `: ${createdLabel}` : ""}.`,
+  });
 
   await setFlashMessage({
     type: "success",
@@ -315,7 +373,7 @@ export async function createInventoryItem(formData: FormData) {
 export async function updateInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
   const owned = await assertOwnedRecord(kind, id, workspaceId);
 
   if (!owned) {
@@ -530,6 +588,25 @@ export async function updateInventoryItem(formData: FormData) {
       throw new Error(`Unsupported update kind: ${kind}`);
   }
 
+  const updatedLabelParts = [
+    optionalString(formData, "brand"),
+    optionalString(formData, "color"),
+    optionalString(formData, "materialType"),
+  ].filter(Boolean);
+  const updatedLabel =
+    optionalString(formData, "name") ??
+    (updatedLabelParts.length > 0 ? updatedLabelParts.join(" ") : id);
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: kind,
+    entityId: id,
+    entityLabel: updatedLabel,
+    summary: `Updated ${kind} record${updatedLabel ? `: ${updatedLabel}` : ""}.`,
+  });
+
   await setFlashMessage({
     type: "success",
     title: "Record updated",
@@ -541,7 +618,7 @@ export async function updateInventoryItem(formData: FormData) {
 export async function archiveInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
   const owned = await assertOwnedRecord(kind, id, workspaceId);
 
   if (!owned) {
@@ -574,17 +651,35 @@ export async function archiveInventoryItem(formData: FormData) {
       await prisma.smartPlug.update({ where: { id }, data: { status: "DISABLED" } });
       break;
     case "tool":
-      await prisma.toolPart.delete({ where: { id } });
+      await prisma.toolPart.update({ where: { id }, data: { archivedAt: new Date() } });
       break;
     case "wishlist":
       await prisma.wishlistItem.update({ where: { id }, data: { status: "PURCHASED" } });
       break;
     case "maintenance":
-      await prisma.maintenanceLog.delete({ where: { id } });
+      await prisma.maintenanceLog.update({
+        where: { id },
+        data: {
+          voidedAt: new Date(),
+          voidReason: "Voided from the maintenance log workflow.",
+        },
+      });
       break;
     default:
       throw new Error(`Unsupported archive kind: ${kind}`);
   }
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: kind === "maintenance" ? "VOID" : "ARCHIVE",
+    entityType: kind,
+    entityId: id,
+    summary:
+      kind === "maintenance"
+        ? "Voided maintenance log entry."
+        : `Archived ${kind} record.`,
+  });
 
   await setFlashMessage({
     type: "success",
@@ -599,7 +694,7 @@ export async function updateFilamentState(formData: FormData) {
   const opened = formData.get("opened") === "true";
   const nearlyEmpty = formData.get("nearlyEmpty") === "true";
   const estimatedRemainingGrams = numberValue(formData, "estimatedRemainingGrams", 0);
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
   const owned = await assertOwnedRecord("filament", id, workspaceId);
 
   if (!owned) {
@@ -616,6 +711,20 @@ export async function updateFilamentState(formData: FormData) {
     },
   });
 
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "filament",
+    entityId: id,
+    summary: "Updated filament operating state.",
+    metadata: {
+      opened,
+      nearlyEmpty,
+      estimatedRemainingGrams,
+    },
+  });
+
   await setFlashMessage({
     type: "success",
     title: "Filament state updated",
@@ -628,7 +737,7 @@ export async function updateFilamentState(formData: FormData) {
 export async function createMaintenanceLog(formData: FormData) {
   const assetType = requiredString(formData, "assetType");
   const assetId = optionalString(formData, "assetId");
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
   const data = {
     date: new Date(requiredString(formData, "date")),
     actionType: requiredString(formData, "actionType") as MaintenanceActionType,
@@ -636,7 +745,7 @@ export async function createMaintenanceLog(formData: FormData) {
     notes: optionalString(formData, "notes"),
   };
 
-  await prisma.maintenanceLog.create({
+  const maintenanceLog = await prisma.maintenanceLog.create({
     data: {
       workspaceId,
       ...data,
@@ -645,6 +754,21 @@ export async function createMaintenanceLog(formData: FormData) {
       ...(assetType === "buildPlate" && assetId ? { buildPlateId: assetId } : {}),
       ...(assetType === "hotend" && assetId ? { hotendId: assetId } : {}),
       ...(assetType === "safety" && assetId ? { safetyEquipmentId: assetId } : {}),
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "CREATE",
+    entityType: "maintenance",
+    entityId: maintenanceLog.id,
+    entityLabel: data.actionPerformed,
+    summary: `Logged maintenance action: ${data.actionPerformed}.`,
+    metadata: {
+      assetType,
+      assetId,
+      actionType: data.actionType,
     },
   });
 
@@ -681,6 +805,22 @@ export async function stageImportJob(formData: FormData) {
     rows,
   });
 
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "IMPORT_STAGE",
+    entityType,
+    entityId: job.id,
+    entityLabel: sourceName,
+    summary: `Staged ${job.totalRows} row(s) for ${entityType.toLowerCase().replace("_", " ")} import.`,
+    metadata: {
+      originalFilename: file.name,
+      totalRows: job.totalRows,
+      conflictRows: job.conflictRows,
+      skippedRows: job.skippedRows,
+    },
+  });
+
   await setFlashMessage({
     type: "success",
     title: "Import staged",
@@ -690,10 +830,23 @@ export async function stageImportJob(formData: FormData) {
 }
 
 export async function applyStagedImport(formData: FormData) {
-  const { workspaceId } = await getWorkspaceContext();
+  const { userId, workspaceId } = await getWorkspaceContext();
   const jobId = requiredString(formData, "jobId");
 
   const job = await applyImportJobRows(jobId, workspaceId);
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "IMPORT_APPLY",
+    entityType: job.entityType,
+    entityId: job.id,
+    entityLabel: job.sourceName,
+    summary: `Applied staged ${job.entityType.toLowerCase().replace("_", " ")} import.`,
+    metadata: {
+      appliedAt: job.appliedAt?.toISOString() ?? null,
+    },
+  });
 
   await setFlashMessage({
     type: "success",
