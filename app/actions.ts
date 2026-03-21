@@ -40,7 +40,7 @@ import {
   updateProfileSchema,
   updateWorkspaceSchema,
 } from "@/lib/validation";
-import { slugify } from "@/lib/utils";
+import { deriveConsumableStatus, slugify } from "@/lib/utils";
 
 function requiredString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -96,6 +96,154 @@ function importEntityValue(formData: FormData, key = "entityType") {
 
 function booleanValue(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
+}
+
+function selectedIds(formData: FormData, key: string) {
+  return Array.from(
+    new Set(
+      formData
+        .getAll(key)
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .map((value) => value.trim()),
+    ),
+  );
+}
+
+async function setPrinterSmartPlug(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  printerId: string,
+  smartPlugId: string | null,
+) {
+  if (smartPlugId) {
+    await tx.printer.updateMany({
+      where: { workspaceId, smartPlugId, id: { not: printerId } },
+      data: { smartPlugId: null },
+    });
+  }
+
+  await tx.printer.update({
+    where: { id: printerId },
+    data: { smartPlugId },
+  });
+}
+
+async function setPrinterInstalledHotend(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  printerId: string,
+  hotendId: string | null,
+) {
+  const currentPrinter = await tx.printer.findFirst({
+    where: { id: printerId, workspaceId },
+    select: { installedHotendId: true },
+  });
+  const previousHotendId = currentPrinter?.installedHotendId ?? null;
+
+  if (hotendId) {
+    await tx.printer.updateMany({
+      where: { workspaceId, installedHotendId: hotendId, id: { not: printerId } },
+      data: { installedHotendId: null },
+    });
+  }
+
+  await tx.printer.update({
+    where: { id: printerId },
+    data: { installedHotendId: hotendId },
+  });
+
+  for (const candidateId of new Set([previousHotendId, hotendId].filter((value): value is string => Boolean(value)))) {
+    const assignedCount = await tx.printer.count({
+      where: { workspaceId, installedHotendId: candidateId },
+    });
+    const hotend = await tx.hotend.findFirst({
+      where: { id: candidateId, workspaceId },
+      select: { quantity: true, status: true },
+    });
+
+    if (hotend) {
+      await tx.hotend.update({
+        where: { id: candidateId },
+        data: {
+          inUseCount: assignedCount,
+          spareCount: Math.max(hotend.quantity - assignedCount, 0),
+          status:
+            hotend.status === "RETIRED"
+              ? "RETIRED"
+              : assignedCount > 0
+                ? "IN_USE"
+                : hotend.quantity <= 1
+                  ? "LOW_STOCK"
+                  : "AVAILABLE",
+        },
+      });
+    }
+  }
+}
+
+async function setPrinterInstalledPlate(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  printerId: string,
+  buildPlateId: string | null,
+) {
+  const currentPrinter = await tx.printer.findFirst({
+    where: { id: printerId, workspaceId },
+    select: { installedPlateId: true },
+  });
+  const previousPlateId = currentPrinter?.installedPlateId ?? null;
+
+  if (buildPlateId) {
+    await tx.printer.updateMany({
+      where: { workspaceId, installedPlateId: buildPlateId, id: { not: printerId } },
+      data: { installedPlateId: null },
+    });
+  }
+
+  await tx.printer.update({
+    where: { id: printerId },
+    data: { installedPlateId: buildPlateId },
+  });
+
+  for (const candidateId of new Set([previousPlateId, buildPlateId].filter((value): value is string => Boolean(value)))) {
+    const assignedCount = await tx.printer.count({
+      where: { workspaceId, installedPlateId: candidateId },
+    });
+    const plate = await tx.buildPlate.findFirst({
+      where: { id: candidateId, workspaceId },
+      select: { status: true },
+    });
+
+    if (plate && plate.status !== "RETIRED" && plate.status !== "WORN") {
+      await tx.buildPlate.update({
+        where: { id: candidateId },
+        data: { status: assignedCount > 0 ? "IN_USE" : "AVAILABLE" },
+      });
+    }
+  }
+}
+
+async function setPrinterMaterialSystems(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  printerId: string,
+  materialSystemIds: string[],
+) {
+  await tx.materialSystem.updateMany({
+    where: {
+      workspaceId,
+      assignedPrinterId: printerId,
+      id: { notIn: materialSystemIds.length > 0 ? materialSystemIds : ["__none__"] },
+    },
+    data: { assignedPrinterId: null },
+  });
+
+  if (materialSystemIds.length > 0) {
+    await tx.materialSystem.updateMany({
+      where: { workspaceId, id: { in: materialSystemIds } },
+      data: { assignedPrinterId: printerId },
+    });
+  }
 }
 
 function summarizeImportRows(rows: Array<{ status: string }>) {
@@ -227,13 +375,14 @@ export async function createInventoryItem(formData: FormData) {
     }
     case "build-plate": {
       const name = requiredString(formData, "name");
+      const sizeMm = numberValue(formData, "sizeMm", 256);
       const buildPlate = await prisma.buildPlate.create({
         data: {
           workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
-          sizeLabel: requiredString(formData, "sizeLabel"),
-          sizeMm: numberValue(formData, "sizeMm", 256),
+          sizeLabel: `${sizeMm.toString()}mm`,
+          sizeMm,
           surfaceType: requiredString(formData, "surfaceType"),
           notes: optionalString(formData, "notes"),
         },
@@ -310,15 +459,18 @@ export async function createInventoryItem(formData: FormData) {
     }
     case "consumable": {
       const name = requiredString(formData, "name");
+      const quantity = numberValue(formData, "quantity", 1);
+      const reorderThreshold = numberValue(formData, "reorderThreshold", 1);
       const consumable = await prisma.consumableItem.create({
         data: {
           workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           category: requiredString(formData, "category"),
-          quantity: numberValue(formData, "quantity", 1),
+          quantity,
           unit: requiredString(formData, "unit"),
-          reorderThreshold: numberValue(formData, "reorderThreshold", 1),
+          reorderThreshold,
+          status: deriveConsumableStatus(quantity, reorderThreshold),
           storageLocation: optionalString(formData, "storageLocation"),
           notes: optionalString(formData, "notes"),
         },
@@ -545,23 +697,30 @@ export async function updateInventoryItem(formData: FormData) {
 
   switch (kind) {
     case "printer":
-      await prisma.printer.update({
-        where: { id },
-        data: {
-          name: requiredString(formData, "name"),
-          brand: requiredString(formData, "brand"),
-          model: requiredString(formData, "model"),
-          status: requiredString(formData, "status") as
-            | "ACTIVE"
-            | "MAINTENANCE"
-            | "OFFLINE"
-            | "ARCHIVED",
-          buildVolumeX: numberValue(formData, "buildVolumeX", 180),
-          buildVolumeY: numberValue(formData, "buildVolumeY", 180),
-          buildVolumeZ: numberValue(formData, "buildVolumeZ", 180),
-          location: optionalString(formData, "location"),
-          notes: optionalString(formData, "notes"),
-        },
+      await prisma.$transaction(async (tx) => {
+        const printer = await tx.printer.update({
+          where: { id },
+          data: {
+            name: requiredString(formData, "name"),
+            brand: requiredString(formData, "brand"),
+            model: requiredString(formData, "model"),
+            status: requiredString(formData, "status") as
+              | "ACTIVE"
+              | "MAINTENANCE"
+              | "OFFLINE"
+              | "ARCHIVED",
+            buildVolumeX: numberValue(formData, "buildVolumeX", 180),
+            buildVolumeY: numberValue(formData, "buildVolumeY", 180),
+            buildVolumeZ: numberValue(formData, "buildVolumeZ", 180),
+            location: optionalString(formData, "location"),
+            notes: optionalString(formData, "notes"),
+          },
+        });
+
+        await setPrinterSmartPlug(tx, workspaceId, printer.id, optionalString(formData, "smartPlugId"));
+        await setPrinterInstalledHotend(tx, workspaceId, printer.id, optionalString(formData, "installedHotendId"));
+        await setPrinterInstalledPlate(tx, workspaceId, printer.id, optionalString(formData, "installedPlateId"));
+        await setPrinterMaterialSystems(tx, workspaceId, printer.id, selectedIds(formData, "materialSystemIds"));
       });
       break;
     case "material-system":
@@ -578,43 +737,74 @@ export async function updateInventoryItem(formData: FormData) {
             | "ARCHIVED",
           supportedMaterialsNotes: optionalString(formData, "supportedMaterialsNotes"),
           notes: optionalString(formData, "notes"),
+          assignedPrinterId: optionalString(formData, "assignedPrinterId"),
         },
       });
       break;
     case "build-plate":
-      await prisma.buildPlate.update({
-        where: { id },
-        data: {
-          name: requiredString(formData, "name"),
-          sizeLabel: requiredString(formData, "sizeLabel"),
-          sizeMm: numberValue(formData, "sizeMm", 256),
-          surfaceType: requiredString(formData, "surfaceType"),
-          status: requiredString(formData, "status") as
-            | "AVAILABLE"
-            | "IN_USE"
-            | "WORN"
-            | "RETIRED",
-          notes: optionalString(formData, "notes"),
-        },
+      await prisma.$transaction(async (tx) => {
+        const sizeMm = numberValue(formData, "sizeMm", 256);
+        await tx.buildPlate.update({
+          where: { id },
+          data: {
+            name: requiredString(formData, "name"),
+            sizeLabel: `${sizeMm.toString()}mm`,
+            sizeMm,
+            surfaceType: requiredString(formData, "surfaceType"),
+            status: requiredString(formData, "status") as
+              | "AVAILABLE"
+              | "IN_USE"
+              | "WORN"
+              | "RETIRED",
+            notes: optionalString(formData, "notes"),
+          },
+        });
+
+        const assignedPrinterId = optionalString(formData, "assignedPrinterId");
+        if (assignedPrinterId) {
+          await setPrinterInstalledPlate(tx, workspaceId, assignedPrinterId, id);
+        } else {
+          await tx.printer.updateMany({
+            where: { workspaceId, installedPlateId: id },
+            data: { installedPlateId: null },
+          });
+        }
       });
       break;
     case "hotend":
-      await prisma.hotend.update({
-        where: { id },
-        data: {
-          name: requiredString(formData, "name"),
-          nozzleSize: numberValue(formData, "nozzleSize", 0.4),
-          materialType: requiredString(formData, "materialType"),
-          quantity: numberValue(formData, "quantity", 1),
-          inUseCount: numberValue(formData, "inUseCount", 0),
-          spareCount: numberValue(formData, "spareCount", 0),
-          status: requiredString(formData, "status") as
-            | "AVAILABLE"
-            | "IN_USE"
-            | "LOW_STOCK"
-            | "RETIRED",
-          notes: optionalString(formData, "notes"),
-        },
+      await prisma.$transaction(async (tx) => {
+        const quantity = numberValue(formData, "quantity", 1);
+        await tx.hotend.update({
+          where: { id },
+          data: {
+            name: requiredString(formData, "name"),
+            nozzleSize: numberValue(formData, "nozzleSize", 0.4),
+            materialType: requiredString(formData, "materialType"),
+            quantity,
+            inUseCount: 0,
+            spareCount: quantity,
+            status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
+            notes: optionalString(formData, "notes"),
+          },
+        });
+
+        const assignedPrinterId = optionalString(formData, "assignedPrinterId");
+        if (assignedPrinterId) {
+          await setPrinterInstalledHotend(tx, workspaceId, assignedPrinterId, id);
+        } else {
+          await tx.printer.updateMany({
+            where: { workspaceId, installedHotendId: id },
+            data: { installedHotendId: null },
+          });
+          await tx.hotend.update({
+            where: { id },
+            data: {
+              inUseCount: 0,
+              spareCount: quantity,
+              status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
+            },
+          });
+        }
       });
       break;
     case "filament":
@@ -667,23 +857,23 @@ export async function updateInventoryItem(formData: FormData) {
       });
       break;
     case "consumable":
-      await prisma.consumableItem.update({
-        where: { id },
-        data: {
-          name: requiredString(formData, "name"),
-          category: requiredString(formData, "category"),
-          quantity: numberValue(formData, "quantity", 1),
-          unit: requiredString(formData, "unit"),
-          reorderThreshold: numberValue(formData, "reorderThreshold", 1),
-          status: requiredString(formData, "status") as
-            | "HEALTHY"
-            | "LOW"
-            | "OUT"
-            | "ARCHIVED",
-          storageLocation: optionalString(formData, "storageLocation"),
-          notes: optionalString(formData, "notes"),
-        },
-      });
+      {
+        const quantity = numberValue(formData, "quantity", 1);
+        const reorderThreshold = numberValue(formData, "reorderThreshold", 1);
+        await prisma.consumableItem.update({
+          where: { id },
+          data: {
+            name: requiredString(formData, "name"),
+            category: requiredString(formData, "category"),
+            quantity,
+            unit: requiredString(formData, "unit"),
+            reorderThreshold,
+            status: deriveConsumableStatus(quantity, reorderThreshold),
+            storageLocation: optionalString(formData, "storageLocation"),
+            notes: optionalString(formData, "notes"),
+          },
+        });
+      }
       break;
     case "safety":
       await prisma.safetyEquipment.update({
@@ -702,18 +892,30 @@ export async function updateInventoryItem(formData: FormData) {
       });
       break;
     case "smart-plug":
-      await prisma.smartPlug.update({
-        where: { id },
-        data: {
-          name: requiredString(formData, "name"),
-          status: requiredString(formData, "status") as
-            | "ONLINE"
-            | "OFFLINE"
-            | "DISABLED",
-          assignedDeviceLabel: optionalString(formData, "assignedDeviceLabel"),
-          powerMonitoringCapable: booleanValue(formData, "powerMonitoringCapable"),
-          notes: optionalString(formData, "notes"),
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.smartPlug.update({
+          where: { id },
+          data: {
+            name: requiredString(formData, "name"),
+            status: requiredString(formData, "status") as
+              | "ONLINE"
+              | "OFFLINE"
+              | "DISABLED",
+            assignedDeviceLabel: optionalString(formData, "assignedDeviceLabel"),
+            powerMonitoringCapable: booleanValue(formData, "powerMonitoringCapable"),
+            notes: optionalString(formData, "notes"),
+          },
+        });
+
+        const assignedPrinterId = optionalString(formData, "assignedPrinterId");
+        if (assignedPrinterId) {
+          await setPrinterSmartPlug(tx, workspaceId, assignedPrinterId, id);
+        } else {
+          await tx.printer.updateMany({
+            where: { workspaceId, smartPlugId: id },
+            data: { smartPlugId: null },
+          });
+        }
       });
       break;
     case "tool":

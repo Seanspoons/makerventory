@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getPrinters } from "@/lib/data";
-import { cn } from "@/lib/utils";
+import { getBuildPlates, getHotends, getMaterialSystems, getPrinters, getSmartPlugs } from "@/lib/data";
+import { cn, formatBuildPlateSize, formatMaterialSystemType } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -23,7 +23,13 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const status = typeof searchParams.status === "string" ? searchParams.status : "ACTIVE";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
-  const printers = await getPrinters();
+  const [printers, hotends, buildPlates, materialSystems, smartPlugs] = await Promise.all([
+    getPrinters(),
+    getHotends(),
+    getBuildPlates(),
+    getMaterialSystems(),
+    getSmartPlugs(),
+  ]);
 
   const filtered = printers.filter((printer) => {
     const haystack = [
@@ -245,6 +251,70 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
                         <LabeledField label="Notes" className="lg:col-span-2">
                           <Textarea name="notes" defaultValue={detail.notes ?? ""} />
                         </LabeledField>
+                        <div className="lg:col-span-2 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                          <p className="text-sm font-medium text-slate-950">Workshop setup assignments</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">
+                            Installed hardware, linked material systems, and smart plug assignment are managed from the printer record.
+                          </p>
+                          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                            <LabeledField label="Installed hotend">
+                              <Select name="installedHotendId" defaultValue={detail.installedHotend?.id ?? ""}>
+                                <option value="">No installed hotend</option>
+                                {hotends.map((hotend) => (
+                                  <option key={hotend.id} value={hotend.id}>
+                                    {hotend.name}
+                                  </option>
+                                ))}
+                              </Select>
+                            </LabeledField>
+                            <LabeledField label="Installed build plate">
+                              <Select name="installedPlateId" defaultValue={detail.installedPlate?.id ?? ""}>
+                                <option value="">No installed build plate</option>
+                                {buildPlates.map((plate) => (
+                                  <option key={plate.id} value={plate.id}>
+                                    {plate.name} ({formatBuildPlateSize(plate.sizeMm)})
+                                  </option>
+                                ))}
+                              </Select>
+                            </LabeledField>
+                            <LabeledField label="Smart plug">
+                              <Select name="smartPlugId" defaultValue={detail.smartPlug?.id ?? ""}>
+                                <option value="">No smart plug assigned</option>
+                                {smartPlugs.map((plug) => (
+                                  <option key={plug.id} value={plug.id}>
+                                    {plug.name}
+                                  </option>
+                                ))}
+                              </Select>
+                            </LabeledField>
+                            <div className="grid gap-2 text-sm text-slate-700">
+                              <span className="font-medium text-slate-700">Linked material systems</span>
+                              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                <div className="space-y-2">
+                                  {materialSystems.length > 0 ? (
+                                    materialSystems.map((system) => (
+                                      <label key={system.id} className="flex items-start gap-2 text-sm text-slate-700">
+                                        <input
+                                          type="checkbox"
+                                          name="materialSystemIds"
+                                          value={system.id}
+                                          defaultChecked={detail.materialSystems.some((item) => item.id === system.id)}
+                                          className="mt-1 rounded"
+                                        />
+                                        <span>
+                                          {system.name}
+                                          <span className="ml-1 text-slate-500">({formatMaterialSystemType(system.type)})</span>
+                                        </span>
+                                      </label>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-slate-500">No material systems are available yet.</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                       </form>
                     </EditDialog>

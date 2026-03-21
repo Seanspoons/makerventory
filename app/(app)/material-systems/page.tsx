@@ -11,7 +11,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getMaterialSystems } from "@/lib/data";
+import { getMaterialSystems, getPrinters } from "@/lib/data";
+import { formatMaterialSystemType } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -20,7 +21,7 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const type = typeof searchParams.type === "string" ? searchParams.type : "ALL";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
-  const items = await getMaterialSystems();
+  const [items, printers] = await Promise.all([getMaterialSystems(), getPrinters()]);
 
   const filtered = items.filter((item) => {
     const haystack = [item.name, item.notes ?? "", item.assignedPrinter?.name ?? ""].join(" ").toLowerCase();
@@ -91,7 +92,7 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                     <div className="min-w-0">
                       <p className={`break-words font-medium ${isSelected ? "text-white" : "text-slate-950"}`}>{item.name}</p>
                       <p className={`mt-1 break-words text-sm ${isSelected ? "text-white/75" : "text-slate-500"}`}>
-                        {item.type} · {item.assignedPrinter?.name ?? "Shared / unassigned"}
+                        {formatMaterialSystemType(item.type)} · {item.assignedPrinter?.name ?? "Not assigned"}
                       </p>
                     </div>
                     <StatusBadge value={item.status} />
@@ -112,7 +113,7 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                     <StatusBadge value={detail.status} />
                   </div>
                   <p className="mt-2 break-words text-sm text-slate-500">
-                    {detail.type} · {detail.assignedPrinter?.name ?? "Shared / unassigned"}
+                    {formatMaterialSystemType(detail.type)} · {detail.assignedPrinter?.name ?? "Not assigned"}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -140,7 +141,16 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                           <option value="ARCHIVED">Archived</option>
                         </Select>
                       </LabeledField>
-                      <div />
+                      <LabeledField label="Assigned printer">
+                        <Select name="assignedPrinterId" defaultValue={detail.assignedPrinter?.id ?? ""}>
+                          <option value="">Not assigned</option>
+                          {printers.map((printer) => (
+                            <option key={printer.id} value={printer.id}>
+                              {printer.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </LabeledField>
                       <LabeledField label="Supported materials notes" className="lg:col-span-2">
                         <Textarea name="supportedMaterialsNotes" defaultValue={detail.supportedMaterialsNotes ?? ""} />
                       </LabeledField>

@@ -11,7 +11,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getBuildPlates } from "@/lib/data";
+import { getBuildPlates, getPrinters } from "@/lib/data";
+import { formatBuildPlateSize } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -20,10 +21,10 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const size = typeof searchParams.size === "string" ? searchParams.size : "ALL";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
-  const items = await getBuildPlates();
+  const [items, printers] = await Promise.all([getBuildPlates(), getPrinters()]);
   const filtered = items.filter((item) => {
     const haystack = [item.name, item.surfaceType, item.notes ?? ""].join(" ").toLowerCase();
-    return (q ? haystack.includes(q) : true) && (size === "ALL" ? true : item.sizeLabel === size);
+    return (q ? haystack.includes(q) : true) && (size === "ALL" ? true : `${item.sizeMm}mm` === size);
   });
   const detail = filtered.find((item) => item.id === selected) ?? filtered[0] ?? null;
 
@@ -39,7 +40,6 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
           <input type="hidden" name="kind" value="build-plate" />
           <Input name="name" placeholder="Name" required />
           <Input name="surfaceType" placeholder="Surface type" required />
-          <Input name="sizeLabel" placeholder="Size label" required />
           <Input name="sizeMm" placeholder="Size mm" type="number" required />
           <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
           <div className="lg:col-span-2"><SubmitButton>Add build plate</SubmitButton></div>
@@ -85,7 +85,7 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
                     <div className="min-w-0">
                       <p className={`break-words font-medium ${isSelected ? "text-white" : "text-slate-950"}`}>{item.name}</p>
                       <p className={`mt-1 break-words text-sm ${isSelected ? "text-white/75" : "text-slate-500"}`}>
-                        {item.sizeLabel} · {item.surfaceType}
+                        {formatBuildPlateSize(item.sizeMm)} · {item.surfaceType}
                       </p>
                     </div>
                     <StatusBadge value={item.status} />
@@ -106,7 +106,7 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
                     <StatusBadge value={detail.status} />
                   </div>
                   <p className="mt-2 break-words text-sm text-slate-500">
-                    {detail.sizeLabel} · {detail.surfaceType} · {detail.sizeMm} mm
+                    {formatBuildPlateSize(detail.sizeMm)} · {detail.surfaceType}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -120,21 +120,26 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
                       <LabeledField label="Surface type">
                         <Input name="surfaceType" defaultValue={detail.surfaceType} required />
                       </LabeledField>
-                      <LabeledField label="Size label">
-                        <Input name="sizeLabel" defaultValue={detail.sizeLabel} required />
-                      </LabeledField>
                       <LabeledField label="Size mm">
                         <Input name="sizeMm" type="number" defaultValue={detail.sizeMm} required />
                       </LabeledField>
                       <LabeledField label="Status">
                         <Select name="status" defaultValue={detail.status}>
                           <option value="AVAILABLE">Available</option>
-                          <option value="IN_USE">In use</option>
                           <option value="WORN">Worn</option>
                           <option value="RETIRED">Retired</option>
                         </Select>
                       </LabeledField>
-                      <div />
+                      <LabeledField label="Installed on printer">
+                        <Select name="assignedPrinterId" defaultValue={detail.installedOnPrinter?.id ?? ""}>
+                          <option value="">Not assigned</option>
+                          {printers.map((printer) => (
+                            <option key={printer.id} value={printer.id}>
+                              {printer.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </LabeledField>
                       <LabeledField label="Notes" className="lg:col-span-2">
                         <Textarea name="notes" defaultValue={detail.notes ?? ""} />
                       </LabeledField>

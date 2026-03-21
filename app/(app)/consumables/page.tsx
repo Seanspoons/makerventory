@@ -18,7 +18,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export default async function ConsumablesPage(props: { searchParams?: SearchParams }) {
   const searchParams = (await props.searchParams) ?? {};
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
-  const status = typeof searchParams.status === "string" ? searchParams.status : "LOW";
+  const status = typeof searchParams.status === "string" ? searchParams.status : "ALL";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
   const items = await getConsumables();
   const filtered = items.filter((item) => {
@@ -93,8 +93,8 @@ export default async function ConsumablesPage(props: { searchParams?: SearchPara
           <div className="w-full md:w-48">
             <label className="mb-2 block text-sm text-slate-500">Status</label>
             <Select name="status" defaultValue={status}>
-              <option value="LOW">Needs attention first</option>
               <option value="ALL">All statuses</option>
+              <option value="LOW">Needs attention first</option>
               <option value="HEALTHY">Healthy</option>
               <option value="OUT">Out</option>
               <option value="ARCHIVED">Archived</option>
@@ -179,14 +179,9 @@ export default async function ConsumablesPage(props: { searchParams?: SearchPara
                       <LabeledField label="Storage location">
                         <Input name="storageLocation" defaultValue={detail.storageLocation ?? ""} />
                       </LabeledField>
-                      <LabeledField label="Status">
-                        <Select name="status" defaultValue={detail.status}>
-                          <option value="HEALTHY">Healthy</option>
-                          <option value="LOW">Low</option>
-                          <option value="OUT">Out</option>
-                          <option value="ARCHIVED">Archived</option>
-                        </Select>
-                      </LabeledField>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600">
+                        Status is derived from quantity versus reorder threshold.
+                      </div>
                       <div />
                       <LabeledField label="Notes" className="lg:col-span-2">
                         <Textarea name="notes" defaultValue={detail.notes ?? ""} />

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { CircleUserRound, LogOut, Search, Sparkles } from "lucide-react";
+import { CircleUserRound, ClipboardList, LogOut, Search } from "lucide-react";
 import { BrandLockup } from "@/components/brand/brand-lockup";
 import { navigation } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -11,9 +12,15 @@ import { cn } from "@/lib/utils";
 export function AppSidebar({
   workspaceName,
   userEmail,
+  dailyFocus,
 }: {
   workspaceName: string;
   userEmail: string;
+  dailyFocus: {
+    title: string;
+    body: string;
+    href: Route;
+  };
 }) {
   const pathname = usePathname();
 
@@ -74,12 +81,17 @@ export function AppSidebar({
 
       <div className="mt-8 rounded-[26px] border border-white/10 bg-white/5 p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
-          <Sparkles className="h-4 w-4" />
+          <ClipboardList className="h-4 w-4" />
           Daily focus
         </div>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
-          Start in Control Center for attention items and next steps, then move into inventory, operations, or planning when you need detail.
-        </p>
+        <p className="mt-2 text-sm font-medium text-white">{dailyFocus.title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{dailyFocus.body}</p>
+        <Link
+          href={dailyFocus.href}
+          className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/8 hover:text-white"
+        >
+          Open
+        </Link>
       </div>
 
       <div className="mt-4 rounded-[26px] border border-white/10 bg-white/5 p-4">

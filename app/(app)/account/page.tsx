@@ -12,6 +12,7 @@ import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 import { Input } from "@/components/ui/input";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { titleCase } from "@/lib/utils";
 
 export default async function AccountPage() {
   const session = await auth();
@@ -32,7 +33,6 @@ export default async function AccountPage() {
       where: { id: session.user.workspaceId },
       select: {
         name: true,
-        slug: true,
       },
     }),
   ]);
@@ -81,10 +81,6 @@ export default async function AccountPage() {
               <Input name="workspaceName" defaultValue={workspace?.name ?? ""} required />
             </div>
             <div>
-              <label className="mb-2 block text-sm text-slate-500">Workspace slug</label>
-              <Input value={workspace?.slug ?? ""} disabled readOnly />
-            </div>
-            <div>
               <SubmitButton>Save workspace</SubmitButton>
             </div>
           </form>
@@ -131,12 +127,12 @@ export default async function AccountPage() {
 
       <SectionCard
         title="Sessions"
-        description="Makerventory uses JWT-backed sessions. Revoke all sessions if you changed your password or want every device to sign in again."
+        description="Manage where your account stays signed in. Sign out all devices if you changed your password or want to reset access everywhere."
       >
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm leading-6 text-slate-600">
             <p className="font-medium text-slate-950">Current access</p>
-            <p className="mt-1">Role: {session.user.workspaceRole}</p>
+            <p className="mt-1">Access level: {titleCase(session.user.workspaceRole)}</p>
             <p>Workspace: {workspace?.name ?? "Workspace"}</p>
           </div>
           <ConfirmActionForm

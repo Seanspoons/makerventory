@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getSmartPlugs } from "@/lib/data";
+import { getPrinters, getSmartPlugs } from "@/lib/data";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -19,7 +19,7 @@ export default async function SmartPlugsPage(props: { searchParams?: SearchParam
   const searchParams = (await props.searchParams) ?? {};
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
-  const items = await getSmartPlugs();
+  const [items, printers] = await Promise.all([getSmartPlugs(), getPrinters()]);
   const filtered = items.filter((item) => [item.name, item.assignedDeviceLabel ?? "", item.notes ?? ""].join(" ").toLowerCase().includes(q));
   const detail = filtered.find((item) => item.id === selected) ?? filtered[0] ?? null;
 
@@ -130,6 +130,16 @@ export default async function SmartPlugsPage(props: { searchParams?: SearchParam
                           <option value="ONLINE">Online</option>
                           <option value="OFFLINE">Offline</option>
                           <option value="DISABLED">Disabled</option>
+                        </Select>
+                      </LabeledField>
+                      <LabeledField label="Assigned printer">
+                        <Select name="assignedPrinterId" defaultValue={detail.printer?.id ?? ""}>
+                          <option value="">Not assigned</option>
+                          {printers.map((printer) => (
+                            <option key={printer.id} value={printer.id}>
+                              {printer.name}
+                            </option>
+                          ))}
                         </Select>
                       </LabeledField>
                       <LabeledField label="Capabilities">

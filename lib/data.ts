@@ -7,6 +7,7 @@ import {
 import { subDays } from "date-fns";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deriveConsumableStatus } from "@/lib/utils";
 
 async function getWorkspaceId() {
   const session = await requireSession();
@@ -140,10 +141,17 @@ export async function getDashboardData() {
 
   return {
     lowStockConsumables: consumables
+      .map((item) => ({
+        ...item,
+        status:
+          item.status === StockStatus.ARCHIVED
+            ? item.status
+            : deriveConsumableStatus(Number(item.quantity), Number(item.reorderThreshold)),
+      }))
       .filter(
         (item) =>
           item.status === StockStatus.LOW ||
-          Number(item.quantity) <= Number(item.reorderThreshold),
+          item.status === StockStatus.OUT,
       )
       .slice(0, 8),
     totals: {
@@ -152,11 +160,13 @@ export async function getDashboardData() {
       totalFilamentSpools: totalFilamentSpools._sum.quantity ?? 0,
       lowStockItems:
         lowStockFilament.length +
-        consumables.filter(
-          (item) =>
-            item.status === StockStatus.LOW ||
-            Number(item.quantity) <= Number(item.reorderThreshold),
-        ).length,
+        consumables.filter((item) => {
+          const status =
+            item.status === StockStatus.ARCHIVED
+              ? item.status
+              : deriveConsumableStatus(Number(item.quantity), Number(item.reorderThreshold));
+          return status === StockStatus.LOW || status === StockStatus.OUT;
+        }).length,
       wishlistCount,
       maintenanceCount,
     },
@@ -297,10 +307,17 @@ export async function getFilament() {
 
 export async function getConsumables() {
   const workspaceId = await getWorkspaceId();
-  return prisma.consumableItem.findMany({
+  const items = await prisma.consumableItem.findMany({
     where: { workspaceId },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
+  return items.map((item) => ({
+    ...item,
+    status:
+      item.status === StockStatus.ARCHIVED
+        ? item.status
+        : deriveConsumableStatus(Number(item.quantity), Number(item.reorderThreshold)),
+  }));
 }
 
 export async function getSafetyEquipment() {

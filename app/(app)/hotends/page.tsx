@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getHotends } from "@/lib/data";
+import { getHotends, getPrinters } from "@/lib/data";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -20,7 +20,7 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
   const q = typeof searchParams.q === "string" ? searchParams.q.toLowerCase() : "";
   const material = typeof searchParams.material === "string" ? searchParams.material : "ALL";
   const selected = typeof searchParams.selected === "string" ? searchParams.selected : "";
-  const items = await getHotends();
+  const [items, printers] = await Promise.all([getHotends(), getPrinters()]);
   const filtered = items.filter((item) => {
     const haystack = [item.name, item.materialType, item.notes ?? ""].join(" ").toLowerCase();
     return (q ? haystack.includes(q) : true) && (material === "ALL" ? true : item.materialType === material);
@@ -88,11 +88,11 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                         {item.nozzleSize.toString()} mm · {item.materialType}
                       </p>
                     </div>
-                    <StatusBadge value={item.status} />
+                    <StatusBadge value={item.status === "RETIRED" ? "RETIRED" : item.installedOnPrinter ? "IN_USE" : item.quantity <= 1 ? "LOW_STOCK" : "AVAILABLE"} />
                   </div>
                   <div className={`mt-3 grid gap-2 text-sm md:grid-cols-2 ${isSelected ? "text-white/80" : "text-slate-600"}`}>
                     <p>Qty {item.quantity}</p>
-                    <p>In use {item.inUseCount}</p>
+                    <p>Installed {item.installedOnPrinter ? 1 : 0}</p>
                   </div>
                 </a>
               );
@@ -107,7 +107,7 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     <h2 className="break-words text-2xl font-semibold tracking-tight text-slate-950">{detail.name}</h2>
-                    <StatusBadge value={detail.status} />
+                    <StatusBadge value={detail.status === "RETIRED" ? "RETIRED" : detail.installedOnPrinter ? "IN_USE" : detail.quantity <= 1 ? "LOW_STOCK" : "AVAILABLE"} />
                   </div>
                   <p className="mt-2 break-words text-sm text-slate-500">
                     {detail.nozzleSize.toString()} mm · {detail.materialType}
@@ -130,21 +130,20 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                       <LabeledField label="Quantity">
                         <Input name="quantity" type="number" defaultValue={detail.quantity} required />
                       </LabeledField>
-                      <LabeledField label="In use count">
-                        <Input name="inUseCount" type="number" defaultValue={detail.inUseCount} required />
-                      </LabeledField>
-                      <LabeledField label="Spare count">
-                        <Input name="spareCount" type="number" defaultValue={detail.spareCount} required />
-                      </LabeledField>
-                      <LabeledField label="Status">
-                        <Select name="status" defaultValue={detail.status}>
-                          <option value="AVAILABLE">Available</option>
-                          <option value="IN_USE">In use</option>
-                          <option value="LOW_STOCK">Low stock</option>
-                          <option value="RETIRED">Retired</option>
+                      <LabeledField label="Installed on printer">
+                        <Select name="assignedPrinterId" defaultValue={detail.installedOnPrinter?.id ?? ""}>
+                          <option value="">Not assigned</option>
+                          {printers.map((printer) => (
+                            <option key={printer.id} value={printer.id}>
+                              {printer.name}
+                            </option>
+                          ))}
                         </Select>
                       </LabeledField>
                       <div />
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600">
+                        In-use and spare counts are derived from quantity and installed assignment.
+                      </div>
                       <LabeledField label="Notes" className="lg:col-span-2">
                         <Textarea name="notes" defaultValue={detail.notes ?? ""} />
                       </LabeledField>
@@ -162,11 +161,11 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">In use</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{detail.inUseCount}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{detail.installedOnPrinter ? 1 : 0}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Spare</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{detail.spareCount}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{Math.max(detail.quantity - (detail.installedOnPrinter ? 1 : 0), 0)}</p>
                 </div>
               </div>
 
