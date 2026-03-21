@@ -19,7 +19,7 @@ type PreviewRow = {
 
 type PreviewGroup = {
   groupKey: string;
-  entityType: ImportEntityType;
+  entityType?: ImportEntityType | null;
   sectionLabel: string;
   sourceName: string;
   totalRows: number;
@@ -135,7 +135,10 @@ export function NotesImportPanel({
             </p>
           </div>
 
-          {preview.map((group) => (
+          {preview.map((group) => {
+            const entityLabel = titleCase(group.entityType ?? undefined);
+
+            return (
             <div key={group.sourceName} className="rounded-[24px] border border-slate-200 bg-white p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -154,7 +157,7 @@ export function NotesImportPanel({
                   </label>
                   <div>
                     <p className="font-medium text-slate-950">{group.sectionLabel}</p>
-                    <p className="mt-1 text-sm text-slate-500">{titleCase(group.entityType)}</p>
+                    <p className="mt-1 text-sm text-slate-500">{entityLabel}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -176,7 +179,7 @@ export function NotesImportPanel({
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Type</p>
-                  <p className="mt-2 text-sm font-medium text-slate-950">{titleCase(group.entityType)}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-950">{entityLabel}</p>
                 </div>
               </div>
 
@@ -217,7 +220,8 @@ export function NotesImportPanel({
                 ) : null}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>

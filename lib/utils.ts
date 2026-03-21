@@ -25,7 +25,11 @@ export function formatCurrency(value: number | null | undefined) {
   }).format(value);
 }
 
-export function titleCase(value: string) {
+export function titleCase(value: string | null | undefined) {
+  if (!value) {
+    return "Unknown";
+  }
+
   return value
     .toLowerCase()
     .split(/[_\s-]+/)
