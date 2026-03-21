@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -161,24 +162,40 @@ export default async function WishlistPage(props: { searchParams?: SearchParams 
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="wishlist" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Input name="category" defaultValue={detail.category} required />
-                      <Select name="priority" defaultValue={detail.priority}>
-                        <option value="CRITICAL">Critical</option>
-                        <option value="HIGH">High</option>
-                        <option value="MEDIUM">Medium</option>
-                        <option value="LOW">Low</option>
-                      </Select>
-                      <Select name="status" defaultValue={detail.status}>
-                        <option value="PLANNED">Planned</option>
-                        <option value="RESEARCHING">Researching</option>
-                        <option value="READY_TO_BUY">Ready to buy</option>
-                        <option value="PURCHASED">Purchased</option>
-                      </Select>
-                      <Input name="estimatedCost" type="number" step="0.01" defaultValue={Number(detail.estimatedCost ?? 0)} />
-                      <Input name="vendor" defaultValue={detail.vendor ?? ""} />
-                      <Input name="purchaseUrl" defaultValue={detail.purchaseUrl ?? ""} className="lg:col-span-2" />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Category">
+                        <Input name="category" defaultValue={detail.category} required />
+                      </LabeledField>
+                      <LabeledField label="Priority">
+                        <Select name="priority" defaultValue={detail.priority}>
+                          <option value="CRITICAL">Critical</option>
+                          <option value="HIGH">High</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="LOW">Low</option>
+                        </Select>
+                      </LabeledField>
+                      <LabeledField label="Status">
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="PLANNED">Planned</option>
+                          <option value="RESEARCHING">Researching</option>
+                          <option value="READY_TO_BUY">Ready to buy</option>
+                          <option value="PURCHASED">Purchased</option>
+                        </Select>
+                      </LabeledField>
+                      <LabeledField label="Estimated cost">
+                        <Input name="estimatedCost" type="number" step="0.01" defaultValue={Number(detail.estimatedCost ?? 0)} />
+                      </LabeledField>
+                      <LabeledField label="Vendor">
+                        <Input name="vendor" defaultValue={detail.vendor ?? ""} />
+                      </LabeledField>
+                      <LabeledField label="Purchase URL" className="lg:col-span-2">
+                        <Input name="purchaseUrl" defaultValue={detail.purchaseUrl ?? ""} />
+                      </LabeledField>
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>

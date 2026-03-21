@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -117,20 +118,36 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="hotend" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Input name="materialType" defaultValue={detail.materialType} required />
-                      <Input name="nozzleSize" type="number" step="0.1" defaultValue={detail.nozzleSize.toString()} required />
-                      <Input name="quantity" type="number" defaultValue={detail.quantity} required />
-                      <Input name="inUseCount" type="number" defaultValue={detail.inUseCount} required />
-                      <Input name="spareCount" type="number" defaultValue={detail.spareCount} required />
-                      <Select name="status" defaultValue={detail.status}>
-                        <option value="AVAILABLE">Available</option>
-                        <option value="IN_USE">In use</option>
-                        <option value="LOW_STOCK">Low stock</option>
-                        <option value="RETIRED">Retired</option>
-                      </Select>
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Material type">
+                        <Input name="materialType" defaultValue={detail.materialType} required />
+                      </LabeledField>
+                      <LabeledField label="Nozzle size">
+                        <Input name="nozzleSize" type="number" step="0.1" defaultValue={detail.nozzleSize.toString()} required />
+                      </LabeledField>
+                      <LabeledField label="Quantity">
+                        <Input name="quantity" type="number" defaultValue={detail.quantity} required />
+                      </LabeledField>
+                      <LabeledField label="In use count">
+                        <Input name="inUseCount" type="number" defaultValue={detail.inUseCount} required />
+                      </LabeledField>
+                      <LabeledField label="Spare count">
+                        <Input name="spareCount" type="number" defaultValue={detail.spareCount} required />
+                      </LabeledField>
+                      <LabeledField label="Status">
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="AVAILABLE">Available</option>
+                          <option value="IN_USE">In use</option>
+                          <option value="LOW_STOCK">Low stock</option>
+                          <option value="RETIRED">Retired</option>
+                        </Select>
+                      </LabeledField>
                       <div />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>

@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -113,18 +114,30 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="build-plate" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Input name="surfaceType" defaultValue={detail.surfaceType} required />
-                      <Input name="sizeLabel" defaultValue={detail.sizeLabel} required />
-                      <Input name="sizeMm" type="number" defaultValue={detail.sizeMm} required />
-                      <Select name="status" defaultValue={detail.status}>
-                        <option value="AVAILABLE">Available</option>
-                        <option value="IN_USE">In use</option>
-                        <option value="WORN">Worn</option>
-                        <option value="RETIRED">Retired</option>
-                      </Select>
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Surface type">
+                        <Input name="surfaceType" defaultValue={detail.surfaceType} required />
+                      </LabeledField>
+                      <LabeledField label="Size label">
+                        <Input name="sizeLabel" defaultValue={detail.sizeLabel} required />
+                      </LabeledField>
+                      <LabeledField label="Size mm">
+                        <Input name="sizeMm" type="number" defaultValue={detail.sizeMm} required />
+                      </LabeledField>
+                      <LabeledField label="Status">
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="AVAILABLE">Available</option>
+                          <option value="IN_USE">In use</option>
+                          <option value="WORN">Worn</option>
+                          <option value="RETIRED">Retired</option>
+                        </Select>
+                      </LabeledField>
                       <div />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>

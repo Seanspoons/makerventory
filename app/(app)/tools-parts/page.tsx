@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -98,11 +99,21 @@ export default async function ToolsPartsPage(props: { searchParams?: SearchParam
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="tool" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Input name="category" defaultValue={detail.category} required />
-                      <Input name="quantity" type="number" defaultValue={detail.quantity} required />
-                      <Input name="storageLocation" defaultValue={detail.storageLocation ?? ""} />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Category">
+                        <Input name="category" defaultValue={detail.category} required />
+                      </LabeledField>
+                      <LabeledField label="Quantity">
+                        <Input name="quantity" type="number" defaultValue={detail.quantity} required />
+                      </LabeledField>
+                      <LabeledField label="Storage location">
+                        <Input name="storageLocation" defaultValue={detail.storageLocation ?? ""} />
+                      </LabeledField>
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>

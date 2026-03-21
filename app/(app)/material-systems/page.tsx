@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -119,23 +120,33 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="material-system" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Select name="type" defaultValue={detail.type}>
-                        <option value="AMS_LITE">AMS Lite</option>
-                        <option value="AMS_2_PRO">AMS 2 Pro</option>
-                        <option value="AMS_HT">AMS HT</option>
-                        <option value="DRYER">Dryer</option>
-                      </Select>
-                      <Select name="status" defaultValue={detail.status}>
-                        <option value="ACTIVE">Active</option>
-                        <option value="STANDBY">Standby</option>
-                        <option value="MAINTENANCE">Maintenance</option>
-                        <option value="OFFLINE">Offline</option>
-                        <option value="ARCHIVED">Archived</option>
-                      </Select>
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Type">
+                        <Select name="type" defaultValue={detail.type}>
+                          <option value="AMS_LITE">AMS Lite</option>
+                          <option value="AMS_2_PRO">AMS 2 Pro</option>
+                          <option value="AMS_HT">AMS HT</option>
+                          <option value="DRYER">Dryer</option>
+                        </Select>
+                      </LabeledField>
+                      <LabeledField label="Status">
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="ACTIVE">Active</option>
+                          <option value="STANDBY">Standby</option>
+                          <option value="MAINTENANCE">Maintenance</option>
+                          <option value="OFFLINE">Offline</option>
+                          <option value="ARCHIVED">Archived</option>
+                        </Select>
+                      </LabeledField>
                       <div />
-                      <Textarea name="supportedMaterialsNotes" defaultValue={detail.supportedMaterialsNotes ?? ""} className="lg:col-span-2" />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Supported materials notes" className="lg:col-span-2">
+                        <Textarea name="supportedMaterialsNotes" defaultValue={detail.supportedMaterialsNotes ?? ""} />
+                      </LabeledField>
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -195,21 +196,39 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
                       <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                         <input type="hidden" name="kind" value="printer" />
                         <input type="hidden" name="id" value={detail.id} />
-                        <Input name="name" defaultValue={detail.name} required />
-                        <Input name="brand" defaultValue={detail.brand} required />
-                        <Input name="model" defaultValue={detail.model} required />
-                        <Input name="location" defaultValue={detail.location ?? ""} />
-                        <Select name="status" defaultValue={detail.status}>
-                          <option value="ACTIVE">Active</option>
-                          <option value="MAINTENANCE">Maintenance</option>
-                          <option value="OFFLINE">Offline</option>
-                          <option value="ARCHIVED">Archived</option>
-                        </Select>
+                        <LabeledField label="Name">
+                          <Input name="name" defaultValue={detail.name} required />
+                        </LabeledField>
+                        <LabeledField label="Brand">
+                          <Input name="brand" defaultValue={detail.brand} required />
+                        </LabeledField>
+                        <LabeledField label="Model">
+                          <Input name="model" defaultValue={detail.model} required />
+                        </LabeledField>
+                        <LabeledField label="Location">
+                          <Input name="location" defaultValue={detail.location ?? ""} />
+                        </LabeledField>
+                        <LabeledField label="Status">
+                          <Select name="status" defaultValue={detail.status}>
+                            <option value="ACTIVE">Active</option>
+                            <option value="MAINTENANCE">Maintenance</option>
+                            <option value="OFFLINE">Offline</option>
+                            <option value="ARCHIVED">Archived</option>
+                          </Select>
+                        </LabeledField>
                         <div />
-                        <Input name="buildVolumeX" type="number" defaultValue={detail.buildVolumeX} required />
-                        <Input name="buildVolumeY" type="number" defaultValue={detail.buildVolumeY} required />
-                        <Input name="buildVolumeZ" type="number" defaultValue={detail.buildVolumeZ} required />
-                        <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                        <LabeledField label="Build volume X">
+                          <Input name="buildVolumeX" type="number" defaultValue={detail.buildVolumeX} required />
+                        </LabeledField>
+                        <LabeledField label="Build volume Y">
+                          <Input name="buildVolumeY" type="number" defaultValue={detail.buildVolumeY} required />
+                        </LabeledField>
+                        <LabeledField label="Build volume Z">
+                          <Input name="buildVolumeZ" type="number" defaultValue={detail.buildVolumeZ} required />
+                        </LabeledField>
+                        <LabeledField label="Notes" className="lg:col-span-2">
+                          <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                        </LabeledField>
                         <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                       </form>
                     </EditDialog>

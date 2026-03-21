@@ -1,4 +1,5 @@
 import { createInventoryItem, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -123,16 +124,26 @@ export default async function SafetyPage(props: { searchParams?: SearchParams })
                     <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                       <input type="hidden" name="kind" value="safety" />
                       <input type="hidden" name="id" value={detail.id} />
-                      <Input name="name" defaultValue={detail.name} required />
-                      <Input name="type" defaultValue={detail.type} required />
-                      <Select name="status" defaultValue={detail.status}>
-                        <option value="ACTIVE">Active</option>
-                        <option value="NEEDS_ATTENTION">Needs attention</option>
-                        <option value="PLANNED">Planned</option>
-                        <option value="ARCHIVED">Archived</option>
-                      </Select>
-                      <Input name="replacementSchedule" defaultValue={detail.replacementSchedule ?? ""} />
-                      <Textarea name="notes" defaultValue={detail.notes ?? ""} className="lg:col-span-2" />
+                      <LabeledField label="Name">
+                        <Input name="name" defaultValue={detail.name} required />
+                      </LabeledField>
+                      <LabeledField label="Type">
+                        <Input name="type" defaultValue={detail.type} required />
+                      </LabeledField>
+                      <LabeledField label="Status">
+                        <Select name="status" defaultValue={detail.status}>
+                          <option value="ACTIVE">Active</option>
+                          <option value="NEEDS_ATTENTION">Needs attention</option>
+                          <option value="PLANNED">Planned</option>
+                          <option value="ARCHIVED">Archived</option>
+                        </Select>
+                      </LabeledField>
+                      <LabeledField label="Replacement schedule">
+                        <Input name="replacementSchedule" defaultValue={detail.replacementSchedule ?? ""} />
+                      </LabeledField>
+                      <LabeledField label="Notes" className="lg:col-span-2">
+                        <Textarea name="notes" defaultValue={detail.notes ?? ""} />
+                      </LabeledField>
                       <div className="lg:col-span-2"><SubmitButton>Save changes</SubmitButton></div>
                     </form>
                   </EditDialog>
