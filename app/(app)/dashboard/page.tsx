@@ -107,13 +107,13 @@ export default async function DashboardPage() {
             action={
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-start xl:justify-end">
                 <Button asChild className="!text-white [&_svg]:!text-white">
-                  <Link href={hasInventory ? "/imports" : "/printers"}>
+                  <Link href={hasInventory ? "/imports" : "/welcome"}>
                     {hasInventory ? "Review imports" : "Start setup"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
                 <Button asChild variant="secondary">
-                  <Link href={hasInventory ? "/filament" : "/printers"}>
+                  <Link href={hasInventory ? "/filament" : "/welcome?step=printer"}>
                     {hasInventory ? "Add stock" : "Add first printer"}
                   </Link>
                 </Button>
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
               </p>
               <div className="mt-5">
                 <Button asChild className="!text-white [&_svg]:!text-white">
-                  <Link href="/imports">
+                  <Link href="/welcome">
                     Open onboarding
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
