@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ImportRowResolution, ImportRowStatus } from "@prisma/client";
+import type { ImportRowResolution } from "@prisma/client";
+import { ImportRowStatus } from "@prisma/client";
 import { format } from "date-fns";
 import {
   applyStagedImport,
@@ -49,8 +50,8 @@ function canSkipRow(status: ImportRowStatus) {
 }
 
 function resolutionLabel(resolution: ImportRowResolution) {
-  if (resolution === ImportRowResolution.UPDATE_MATCH) return "Update match";
-  if (resolution === ImportRowResolution.SKIP) return "Skip";
+  if (resolution === "UPDATE_MATCH") return "Update match";
+  if (resolution === "SKIP") return "Skip";
   return "Create new";
 }
 
@@ -82,11 +83,53 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         }
       />
 
+      <SectionCard
+        title="Choose import method"
+        description="Start with the path that matches the format you already have."
+      >
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+              CSV import
+            </p>
+            <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
+              Use this if you already have structured columns
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Best for spreadsheets, exports, or cleaned inventory lists where each row already maps to a record.
+            </p>
+            <div className="mt-4">
+              <Button asChild variant="secondary">
+                <Link href="#csv-import">Go to CSV import</Link>
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-950 bg-slate-950 p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Notes import
+            </p>
+            <p className="mt-3 text-xl font-semibold tracking-tight text-white">
+              Use this if your inventory is sitting in Apple Notes or plain text
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Best for structured workshop notes with headings like printers, filament, consumables, smart plugs, and wishlist items.
+            </p>
+            <div className="mt-4">
+              <Button asChild className="!text-white [&_svg]:!text-white">
+                <Link href="#notes-import">Go to Notes import</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <SectionCard
-          title="Stage CSV import"
-          description="Upload a focused CSV, review the staged rows, and apply changes deliberately so your workshop data stays clean and organized."
-        >
+        <div id="csv-import">
+          <SectionCard
+            title="Stage CSV import"
+            description="Upload a focused CSV, review the staged rows, and apply changes deliberately so your workshop data stays clean and organized."
+          >
           <div className="mb-5 flex flex-wrap gap-2">
             {importEntityOptions.map((option) => (
               <Button key={option.value} asChild variant="secondary" size="sm">
@@ -171,14 +214,17 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               <SubmitButton>Stage import</SubmitButton>
             </div>
           </form>
-        </SectionCard>
+          </SectionCard>
+        </div>
 
-        <SectionCard
-          title="Paste inventory notes"
-          description="Paste Apple Notes or similar text exports and stage multiple inventory jobs from one structured note."
-        >
-          <NotesImportPanel action={stageInventoryNotesImport} />
-        </SectionCard>
+        <div id="notes-import">
+          <SectionCard
+            title="Paste inventory notes"
+            description="Paste Apple Notes or similar text exports and stage multiple inventory jobs from one structured note."
+          >
+            <NotesImportPanel action={stageInventoryNotesImport} />
+          </SectionCard>
+        </div>
       </div>
 
       <SectionCard

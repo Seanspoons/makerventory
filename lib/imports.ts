@@ -2,7 +2,6 @@ import {
   FilamentHygroscopicLevel,
   ImportEntityType,
   ImportJobStatus,
-  ImportRowResolution,
   ImportRowStatus,
   MaterialSystemStatus,
   MaterialSystemType,
@@ -39,6 +38,13 @@ const HOTEND_STATUSES = new Set<HotendStatus>(["AVAILABLE", "IN_USE", "LOW_STOCK
 const SAFETY_STATUSES = new Set<SafetyStatus>(["ACTIVE", "NEEDS_ATTENTION", "PLANNED", "ARCHIVED"]);
 const SMART_PLUG_STATUSES = new Set<SmartPlugStatus>(["ONLINE", "OFFLINE", "DISABLED"]);
 const KNOWN_BRANDS = ["Bambu Lab", "ELEGOO", "AnyCubic", "Overture", "Sunlu", "Polymaker", "Siraya Tech", "Creality"];
+const IMPORT_ROW_RESOLUTIONS = {
+  CREATE_NEW: "CREATE_NEW",
+  UPDATE_MATCH: "UPDATE_MATCH",
+  SKIP: "SKIP",
+} as const;
+type ImportRowResolutionValue =
+  (typeof IMPORT_ROW_RESOLUTIONS)[keyof typeof IMPORT_ROW_RESOLUTIONS];
 
 export const importEntityOptions = [
   {
@@ -112,7 +118,7 @@ export type ImportEntityOption = (typeof importEntityOptions)[number];
 type StagedRow = {
   rowIndex: number;
   status: ImportRowStatus;
-  resolution: ImportRowResolution;
+  resolution: ImportRowResolutionValue;
   fingerprint: string;
   suggestedMatchId?: string;
   suggestedMatchSlug?: string;
@@ -405,9 +411,11 @@ function defaultPrinterBuildVolume(model: string) {
 
 function buildRowResolution(status: ImportRowStatus, hasMatch: boolean) {
   if (status === ImportRowStatus.ERROR || status === ImportRowStatus.CONFLICT) {
-    return ImportRowResolution.SKIP;
+    return IMPORT_ROW_RESOLUTIONS.SKIP;
   }
-  return hasMatch ? ImportRowResolution.UPDATE_MATCH : ImportRowResolution.CREATE_NEW;
+  return hasMatch
+    ? IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH
+    : IMPORT_ROW_RESOLUTIONS.CREATE_NEW;
 }
 
 function sectionCategoryName(section: string) {
@@ -757,7 +765,7 @@ function finalizeRows(rows: StagedRow[]) {
     return {
       ...row,
       status: ImportRowStatus.CONFLICT,
-      resolution: ImportRowResolution.SKIP,
+      resolution: IMPORT_ROW_RESOLUTIONS.SKIP,
       validationErrors: [
         ...row.validationErrors,
         `duplicate fingerprint in upload batch at row(s): ${duplicateIndices.join(", ")}`,
@@ -839,10 +847,10 @@ async function stageFilamentRows(
           : ImportRowStatus.NEW;
     const resolution =
       validationErrors.length > 0
-        ? ImportRowResolution.SKIP
+        ? IMPORT_ROW_RESOLUTIONS.SKIP
         : match
-          ? ImportRowResolution.UPDATE_MATCH
-          : ImportRowResolution.CREATE_NEW;
+          ? IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH
+          : IMPORT_ROW_RESOLUTIONS.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
@@ -1098,10 +1106,10 @@ async function stageConsumableRows(
           : ImportRowStatus.NEW;
     const resolution =
       validationErrors.length > 0
-        ? ImportRowResolution.SKIP
+        ? IMPORT_ROW_RESOLUTIONS.SKIP
         : match
-          ? ImportRowResolution.UPDATE_MATCH
-          : ImportRowResolution.CREATE_NEW;
+          ? IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH
+          : IMPORT_ROW_RESOLUTIONS.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
@@ -1155,10 +1163,10 @@ async function stageToolRows(
           : ImportRowStatus.NEW;
     const resolution =
       validationErrors.length > 0
-        ? ImportRowResolution.SKIP
+        ? IMPORT_ROW_RESOLUTIONS.SKIP
         : match
-          ? ImportRowResolution.UPDATE_MATCH
-          : ImportRowResolution.CREATE_NEW;
+          ? IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH
+          : IMPORT_ROW_RESOLUTIONS.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
@@ -1209,10 +1217,10 @@ async function stageWishlistRows(
           : ImportRowStatus.NEW;
     const resolution =
       validationErrors.length > 0
-        ? ImportRowResolution.SKIP
+        ? IMPORT_ROW_RESOLUTIONS.SKIP
         : match
-          ? ImportRowResolution.UPDATE_MATCH
-          : ImportRowResolution.CREATE_NEW;
+          ? IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH
+          : IMPORT_ROW_RESOLUTIONS.CREATE_NEW;
 
     return {
       rowIndex: index + 1,
@@ -1435,7 +1443,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         continue;
       }
 
-      if (row.resolution === ImportRowResolution.SKIP) {
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.SKIP) {
         continue;
       }
 
@@ -1455,7 +1463,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           notes: (payload.notes as string | null) ?? null,
         };
 
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.printer.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1477,7 +1485,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           notes: (payload.notes as string | null) ?? null,
         };
 
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.materialSystem.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1500,7 +1508,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           notes: (payload.notes as string | null) ?? null,
         };
 
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.buildPlate.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1525,7 +1533,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           notes: (payload.notes as string | null) ?? null,
         };
 
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.hotend.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1562,7 +1570,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
               : ["General Purpose"],
         };
 
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.filamentSpool.update({
             where: { id: row.resolvedMatchId },
             data: {
@@ -1618,7 +1626,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           storageLocation: (payload.storageLocation as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.consumableItem.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1639,7 +1647,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           replacementSchedule: (payload.replacementSchedule as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.safetyEquipment.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1660,7 +1668,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           powerMonitoringCapable: Boolean(payload.powerMonitoringCapable),
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.smartPlug.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1681,7 +1689,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           storageLocation: (payload.storageLocation as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.toolPart.update({
             where: { id: row.resolvedMatchId },
             data: common,
@@ -1705,7 +1713,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           purchaseUrl: (payload.purchaseUrl as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };
-        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
           await tx.wishlistItem.update({
             where: { id: row.resolvedMatchId },
             data: common,
