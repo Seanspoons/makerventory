@@ -13,10 +13,5 @@ npm run db:generate
 echo "Applying Prisma migrations..."
 node ./scripts/apply-migrations.mjs
 
-if [ "${SEED_ON_START:-true}" = "true" ]; then
-  echo "Checking seed state..."
-  node ./scripts/seed-if-empty.mjs
-fi
-
 echo "Starting Next.js..."
 npm run dev -- --hostname 0.0.0.0

@@ -16,7 +16,7 @@ Makerventory is a production-style 3D printing inventory and operations manager 
 Makerventory is designed as an internal-tool style SaaS dashboard rather than a toy CRUD demo. The application emphasizes:
 
 - operational workshop visibility
-- realistic seeded data
+- user-owned workspaces and self-serve onboarding
 - compatibility-aware hardware modeling
 - maintenance and inventory workflows
 - future extensibility for telemetry, QR labels, power automation, and usage analytics
@@ -28,7 +28,8 @@ Makerventory is designed as an internal-tool style SaaS dashboard rather than a 
 - Detailed printer pages with installed hardware, linked systems, compatibility coverage, and maintenance history
 - Filament workflow with filters for material, brand, abrasive handling, hygroscopic risk, and stock state
 - Server actions for quick-add flows, maintenance logging, filament state updates, and archive/retire workflows
-- Realistic seeded data for the provided Bambu Lab workshop setup
+- Self-serve signup flow with workspace creation
+- Account settings for profile, workspace, and password management
 
 ## Local Setup
 
@@ -38,7 +39,7 @@ Makerventory is designed as an internal-tool style SaaS dashboard rather than a 
 npm install
 ```
 
-2. Copy the environment file and set a real auth secret plus bootstrap owner credentials:
+2. Copy the environment file and set a real auth secret:
 
 ```bash
 cp .env.example .env
@@ -50,19 +51,13 @@ cp .env.example .env
 npm run db:migrate
 ```
 
-4. Seed the database:
-
-```bash
-npm run db:seed
-```
-
-5. Start the development server:
+4. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-6. Open `http://localhost:3000`.
+5. Open `http://localhost:3000`, create an account, and enter your own inventory data.
 
 ## Docker Quick Start
 
@@ -82,7 +77,7 @@ What happens on startup:
 - Prisma Client is generated
 - committed migrations are applied
 - if Docker detects an older local dev volume created before migration history existed, it resets the local schema once and reapplies migrations
-- the seed runs only if the database is empty
+- no inventory seed is applied automatically
 - Next.js starts in development mode with file watching enabled
 
 Live reload behavior:
@@ -136,16 +131,11 @@ npm run db:migrate
 npm run db:seed
 ```
 
-## Seed Notes
+## Data Onboarding
 
-The seed includes:
-
-- Bambu Lab A1 Mini and Bambu Lab P2S printer records
-- AMS Lite, AMS 2 Pro, AMS HT, and external dryer coverage
-- 180mm and 256mm build plate compatibility
-- A1 Mini and P2S hotend compatibility
-- realistic filament stock states, low-spool conditions, abrasive and hygroscopic guidance
-- maintenance history, smart plug assignments, wishlist priorities, and safety gaps
+- The app no longer injects demo inventory into local or Docker environments.
+- Each user creates their own account and workspace through the signup flow.
+- Inventory, maintenance history, imports, and wishlist data are expected to come from the user rather than bundled seed records.
 
 ## Screenshots
 
@@ -184,4 +174,4 @@ docker compose config
 - The app uses a PostgreSQL datasource in Prisma as requested.
 - Pages are rendered dynamically so the dashboard and inventory views can read live operational data.
 - The UI is optimized primarily for desktop but remains responsive on smaller screens.
-- Authentication now expects a bootstrap owner account from environment variables during the first seed run.
+- Authentication uses a self-serve signup flow instead of a bootstrap owner account.

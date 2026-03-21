@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { LogOut, Search, Sparkles } from "lucide-react";
+import { CircleUserRound, LogOut, Search, Sparkles } from "lucide-react";
 import { navigation } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function AppSidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="sidebar-scroll h-full overflow-y-auto rounded-[30px] border border-slate-200/80 bg-slate-950 px-5 py-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+    <aside className="sidebar-scroll h-full overflow-y-auto rounded-[30px] border border-slate-200/80 bg-slate-950 px-4 py-5 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-5 sm:py-6">
       <div className="flex items-center gap-3 border-b border-white/10 pb-5">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 p-2">
           <Image
@@ -46,9 +46,9 @@ export function AppSidebar({
       </div>
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-        <div className="flex items-center gap-2 text-sm text-slate-300">
+        <div className="flex items-center gap-2 break-words text-sm text-slate-300">
           <Search className="h-4 w-4" />
-          {workspaceName}
+          <span className="min-w-0 break-words">{workspaceName}</span>
         </div>
       </div>
 
@@ -108,10 +108,17 @@ export function AppSidebar({
       <div className="mt-4 rounded-[26px] border border-white/10 bg-white/5 p-4">
         <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Session</p>
         <p className="mt-2 truncate text-sm text-slate-200">{userEmail}</p>
+        <Link
+          href="/account"
+          className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/8 hover:text-white"
+        >
+          <CircleUserRound className="h-4 w-4" />
+          My account
+        </Link>
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/sign-in" })}
-          className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/8 hover:text-white"
+          className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/8 hover:text-white"
         >
           <LogOut className="h-4 w-4" />
           Sign out

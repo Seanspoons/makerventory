@@ -10,8 +10,10 @@ import {
   WishlistPriority,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { setFlashMessage } from "@/lib/flash";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import {
   applyImportJobRows,
   createImportJobWithRows,
@@ -33,6 +35,10 @@ function requiredString(formData: FormData, key: string) {
 function optionalString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function emailValue(formData: FormData, key: string) {
+  return requiredString(formData, key).toLowerCase();
 }
 
 function numberValue(formData: FormData, key: string, fallback = 0) {
@@ -80,6 +86,19 @@ async function getWorkspaceContext() {
     userId: session.user.id,
     workspaceId: session.user.workspaceId,
   };
+}
+
+async function uniqueWorkspaceSlug(name: string) {
+  const base = slugify(name) || "workspace";
+  const existing = await prisma.workspace.count({
+    where: {
+      slug: {
+        startsWith: base,
+      },
+    },
+  });
+
+  return existing === 0 ? base : `${base}-${existing + 1}`;
 }
 
 async function logAuditEvent(args: {
@@ -370,6 +389,95 @@ export async function createInventoryItem(formData: FormData) {
   revalidateInventory();
 }
 
+export async function signUpUser(formData: FormData) {
+  const name = requiredString(formData, "name");
+  const workspaceName = requiredString(formData, "workspaceName");
+  const email = emailValue(formData, "email");
+  const password = requiredString(formData, "password");
+  const confirmPassword = requiredString(formData, "confirmPassword");
+
+  if (password.length < 12) {
+    await setFlashMessage({
+      type: "error",
+      title: "Password too short",
+      message: "Use at least 12 characters for your account password.",
+    });
+    redirect("/sign-up");
+  }
+
+  if (password !== confirmPassword) {
+    await setFlashMessage({
+      type: "error",
+      title: "Passwords do not match",
+      message: "Re-enter the password confirmation and try again.",
+    });
+    redirect("/sign-up");
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (existingUser) {
+    await setFlashMessage({
+      type: "error",
+      title: "Account already exists",
+      message: "Use a different email or sign in to your existing account.",
+    });
+    redirect("/sign-up");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const workspaceSlug = await uniqueWorkspaceSlug(workspaceName);
+
+  await prisma.$transaction(async (tx) => {
+    const workspace = await tx.workspace.create({
+      data: {
+        name: workspaceName,
+        slug: workspaceSlug,
+        description: `${workspaceName} workspace`,
+      },
+    });
+
+    const user = await tx.user.create({
+      data: {
+        email,
+        name,
+        passwordHash,
+        activeWorkspaceId: workspace.id,
+      },
+    });
+
+    await tx.workspaceMember.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: "OWNER",
+      },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        workspaceId: workspace.id,
+        actorUserId: user.id,
+        actionType: "CREATE",
+        entityType: "workspace",
+        entityId: workspace.id,
+        entityLabel: workspace.name,
+        summary: "Created workspace during signup.",
+      },
+    });
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Account created",
+    message: "Sign in with your new credentials to start adding your inventory.",
+  });
+  redirect("/sign-in");
+}
+
 export async function updateInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
@@ -613,6 +721,147 @@ export async function updateInventoryItem(formData: FormData) {
     message: "Your changes were saved successfully.",
   });
   revalidateInventory();
+}
+
+export async function updateAccountProfile(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const name = requiredString(formData, "name");
+  const email = emailValue(formData, "email");
+
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      email,
+      id: { not: userId },
+    },
+    select: { id: true },
+  });
+
+  if (existingUser) {
+    await setFlashMessage({
+      type: "error",
+      title: "Email unavailable",
+      message: "That email address is already assigned to another account.",
+    });
+    redirect("/account");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      name,
+      email,
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "account",
+    entityId: userId,
+    entityLabel: name,
+    summary: "Updated account profile details.",
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Profile updated",
+    message: "Your account profile was saved.",
+  });
+  revalidatePath("/account");
+}
+
+export async function updateWorkspaceProfile(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const workspaceName = requiredString(formData, "workspaceName");
+
+  await prisma.workspace.update({
+    where: { id: workspaceId },
+    data: {
+      name: workspaceName,
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "workspace",
+    entityId: workspaceId,
+    entityLabel: workspaceName,
+    summary: "Updated workspace settings.",
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Workspace updated",
+    message: "The workspace name was saved.",
+  });
+  revalidatePath("/account");
+  revalidatePath("/");
+}
+
+export async function changeAccountPassword(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const currentPassword = requiredString(formData, "currentPassword");
+  const nextPassword = requiredString(formData, "nextPassword");
+  const confirmPassword = requiredString(formData, "confirmPassword");
+
+  if (nextPassword.length < 12) {
+    await setFlashMessage({
+      type: "error",
+      title: "Password too short",
+      message: "Use at least 12 characters for the new password.",
+    });
+    redirect("/account");
+  }
+
+  if (nextPassword !== confirmPassword) {
+    await setFlashMessage({
+      type: "error",
+      title: "Passwords do not match",
+      message: "Re-enter the new password confirmation and try again.",
+    });
+    redirect("/account");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true, name: true },
+  });
+
+  if (!user?.passwordHash || !(await verifyPassword(currentPassword, user.passwordHash))) {
+    await setFlashMessage({
+      type: "error",
+      title: "Current password is incorrect",
+      message: "Enter your existing password to make this change.",
+    });
+    redirect("/account");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: await hashPassword(nextPassword),
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "account",
+    entityId: userId,
+    entityLabel: user.name ?? null,
+    summary: "Changed account password.",
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Password updated",
+    message: "Your password has been changed.",
+  });
+  revalidatePath("/account");
 }
 
 export async function archiveInventoryItem(formData: FormData) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { Route } from "next";
 import { signIn } from "next-auth/react";
@@ -41,15 +42,15 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="app-shell-grid flex min-h-screen items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-md p-8">
+    <main className="app-shell-grid flex min-h-screen items-center justify-center px-3 py-8 sm:px-4 sm:py-10">
+      <Card className="w-full max-w-md p-5 sm:p-8">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
             <LockKeyhole className="h-5 w-5" />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">
-              Secure Access
+              Welcome back
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
               Sign in to Makerventory
@@ -58,7 +59,7 @@ export default function SignInPage() {
         </div>
 
         <p className="mt-4 text-sm leading-6 text-slate-600">
-          Access is restricted to authenticated workspace members.
+          Sign in to manage your printers, materials, maintenance, and workshop operations.
         </p>
 
         <form action={handleSubmit} className="mt-6 space-y-4">
@@ -81,9 +82,17 @@ export default function SignInPage() {
               <span>{error}</span>
             </div>
           ) : null}
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Signing in..." : "Sign in"}
-          </Button>
+          <div className="space-y-3">
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending ? "Signing in..." : "Sign in"}
+            </Button>
+            <p className="text-center text-sm text-slate-500">
+              Need an account?{" "}
+              <Link href="/sign-up" className="font-medium text-slate-950 underline-offset-4 hover:underline">
+                Create one
+              </Link>
+            </p>
+          </div>
         </form>
       </Card>
     </main>

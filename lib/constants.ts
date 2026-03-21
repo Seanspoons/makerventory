@@ -1,5 +1,5 @@
 import type { Route } from "next";
-import { DatabaseZap, Layers3, Package, ScrollText, ShieldCheck, ShoppingCart, Wrench } from "lucide-react";
+import { CircleUserRound, DatabaseZap, Layers3, Package, ScrollText, ShieldCheck, ShoppingCart, Wrench } from "lucide-react";
 
 export const navigation = [
   {
@@ -23,5 +23,9 @@ export const navigation = [
       { label: "Imports", href: "/imports" as Route, icon: DatabaseZap },
       { label: "Audit Trail", href: "/audit" as Route, icon: ScrollText },
     ],
+  },
+  {
+    title: "Settings",
+    items: [{ label: "My Account", href: "/account" as Route, icon: CircleUserRound }],
   },
 ];
