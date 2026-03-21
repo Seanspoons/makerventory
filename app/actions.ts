@@ -1487,6 +1487,7 @@ export async function applyStagedImport(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
   const logContext = await getRequestLogContext({ userId, workspaceId });
   const jobId = requiredString(formData, "jobId");
+  const returnTo = optionalString(formData, "returnTo");
 
   const job = await applyImportJobRows(jobId, workspaceId);
 
@@ -1514,12 +1515,16 @@ export async function applyStagedImport(formData: FormData) {
     entityType: job.entityType,
   });
   revalidateInventory();
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
 }
 
 export async function updateImportRowDecision(formData: FormData) {
   const { userId, workspaceId } = await getWorkspaceContext();
   const rowId = requiredString(formData, "rowId");
   const decision = requiredString(formData, "decision");
+  const returnTo = optionalString(formData, "returnTo");
 
   if (!["skip", "retry"].includes(decision)) {
     throw new Error("Unsupported import row decision.");
@@ -1600,6 +1605,9 @@ export async function updateImportRowDecision(formData: FormData) {
         : "The staged row is back in the apply queue if it is valid.",
   });
   revalidatePath("/imports");
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
 }
 
 export async function updateImportRowResolution(formData: FormData) {
@@ -1607,6 +1615,7 @@ export async function updateImportRowResolution(formData: FormData) {
   const logContext = await getRequestLogContext({ userId, workspaceId });
   const rowId = requiredString(formData, "rowId");
   const resolution = requiredString(formData, "resolution");
+  const returnTo = optionalString(formData, "returnTo");
 
   if (!["CREATE_NEW", "UPDATE_MATCH", "SKIP"].includes(resolution)) {
     throw new Error("Unsupported import row resolution.");
@@ -1695,4 +1704,7 @@ export async function updateImportRowResolution(formData: FormData) {
     importJobId: row.importJobId,
   });
   revalidatePath("/imports");
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
 }

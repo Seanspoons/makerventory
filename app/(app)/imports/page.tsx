@@ -65,6 +65,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
     ? entityTypeParam
     : "FILAMENT";
   const { jobs, selectedJob } = await getImportJobs(selected);
+  const selectedJobHref = selectedJob ? `/imports?selected=${selectedJob.id}#staged-job` : "/imports#staged-job";
   const actionableRows =
     selectedJob?.rows.filter(
       (row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED,
@@ -319,6 +320,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
           </div>
         </SectionCard>
 
+        <div id="staged-job">
         <SectionCard
           title={selectedJob ? `Staged job: ${selectedJob.sourceName}` : "Staged job detail"}
           description={
@@ -372,12 +374,13 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                     title="Apply staged import"
                     description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
                     confirmLabel="Apply import"
-                    triggerLabel="Apply staged rows"
+                    triggerLabel="Apply all ready rows"
                     triggerVariant="secondary"
                   >
                     <input type="hidden" name="jobId" value={selectedJob.id} />
+                    <input type="hidden" name="returnTo" value={selectedJobHref} />
                     <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
-                      {actionableRows.length} row(s) are eligible to apply.
+                      {actionableRows.length} row(s) are eligible to apply in this job.
                     </div>
                   </ConfirmActionForm>
                 ) : (
@@ -388,29 +391,30 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <table className="min-w-[1120px] divide-y divide-slate-100 text-sm">
                   <thead className="bg-slate-50 text-left text-slate-500">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Row</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Apply as</th>
-                      <th className="px-4 py-3 font-medium">Suggested match</th>
-                      <th className="px-4 py-3 font-medium">Validation</th>
-                      <th className="px-4 py-3 font-medium">Payload</th>
-                      <th className="px-4 py-3 font-medium">Decision</th>
+                      <th className="px-4 py-3 font-medium whitespace-nowrap">Row</th>
+                      <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
+                      <th className="min-w-[220px] px-4 py-3 font-medium whitespace-nowrap">Apply as</th>
+                      <th className="min-w-[180px] px-4 py-3 font-medium whitespace-nowrap">Suggested match</th>
+                      <th className="min-w-[220px] px-4 py-3 font-medium whitespace-nowrap">Validation</th>
+                      <th className="min-w-[360px] px-4 py-3 font-medium whitespace-nowrap">Payload</th>
+                      <th className="min-w-[160px] px-4 py-3 font-medium whitespace-nowrap">Decision</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {selectedJob.rows.map((row) => (
                       <tr key={row.id} className={cn("align-top", rowTone(row.status))}>
-                        <td className="px-4 py-4 font-medium text-slate-950">{row.rowIndex}</td>
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-4 font-medium text-slate-950 whitespace-nowrap">{row.rowIndex}</td>
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <StatusBadge value={row.status} />
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
+                        <td className="min-w-[220px] px-4 py-4 text-slate-600">
                           {selectedJob.status === "STAGED" && row.status !== ImportRowStatus.APPLIED ? (
                             <form action={updateImportRowResolution} className="space-y-2">
                               <input type="hidden" name="rowId" value={row.id} />
+                              <input type="hidden" name="returnTo" value={selectedJobHref} />
                               <Select name="resolution" defaultValue={row.resolution}>
                                 <option value="CREATE_NEW">Create new</option>
                                 <option value="UPDATE_MATCH" disabled={!row.suggestedMatchId}>
@@ -426,10 +430,10 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                             resolutionLabel(row.resolution)
                           )}
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
+                        <td className="min-w-[180px] px-4 py-4 text-slate-600">
                           {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
+                        <td className="min-w-[220px] px-4 py-4 text-slate-600">
                           {row.validationErrors.length > 0 ? (
                             <div className="space-y-1">
                               {row.validationErrors.map((error) => (
@@ -440,17 +444,18 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                             "No validation issues"
                           )}
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="min-w-[360px] px-4 py-4">
                           <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
                             {JSON.stringify(row.data, null, 2)}
                           </pre>
                         </td>
-                        <td className="px-4 py-4">
+                        <td className="min-w-[160px] px-4 py-4">
                           <div className="flex flex-col gap-2">
                             {canSkipRow(row.status) ? (
                               <form action={updateImportRowDecision}>
                                 <input type="hidden" name="rowId" value={row.id} />
                                 <input type="hidden" name="decision" value="skip" />
+                                <input type="hidden" name="returnTo" value={selectedJobHref} />
                                 <SubmitButton variant="secondary" size="sm">
                                   Skip row
                                 </SubmitButton>
@@ -460,6 +465,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                               <form action={updateImportRowDecision}>
                                 <input type="hidden" name="rowId" value={row.id} />
                                 <input type="hidden" name="decision" value="retry" />
+                                <input type="hidden" name="returnTo" value={selectedJobHref} />
                                 <SubmitButton variant="secondary" size="sm">
                                   Re-queue row
                                 </SubmitButton>
@@ -489,6 +495,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
             </div>
           )}
         </SectionCard>
+        </div>
       </div>
     </div>
   );
