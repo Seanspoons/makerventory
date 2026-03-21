@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 
 declare module "next-auth" {
+  interface User {
+    workspaceId: string;
+    workspaceRole: "OWNER" | "ADMIN" | "MEMBER";
+  }
+
   interface Session {
     user: DefaultSession["user"] & {
       id: string;
@@ -25,7 +30,7 @@ declare module "next-auth/jwt" {
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: {
-    strategy: "database",
+    strategy: "jwt",
   },
   pages: {
     signIn: "/sign-in",
@@ -92,16 +97,30 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id;
+        token.workspaceId = user.workspaceId;
+        token.workspaceRole = user.workspaceRole;
+      }
+
+      if (!token.sub) {
+        return token;
+      }
+
       const currentUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: { activeWorkspaceId: true },
+        where: { id: token.sub },
+        select: { activeWorkspaceId: true, isActive: true },
       });
+
+      if (!currentUser?.isActive) {
+        return token;
+      }
 
       const membership = await prisma.workspaceMember.findFirst({
         where: {
-          userId: user.id,
-          workspaceId: currentUser?.activeWorkspaceId ?? undefined,
+          userId: token.sub,
+          workspaceId: currentUser.activeWorkspaceId ?? undefined,
         },
         orderBy: { createdAt: "asc" },
       });
@@ -109,17 +128,26 @@ export const authOptions: NextAuthOptions = {
       const fallbackMembership =
         membership ??
         (await prisma.workspaceMember.findFirst({
-          where: { userId: user.id },
+          where: { userId: token.sub },
           orderBy: { createdAt: "asc" },
         }));
 
-      if (!fallbackMembership || !session.user) {
+      if (!fallbackMembership) {
+        return token;
+      }
+
+      token.workspaceId = fallbackMembership.workspaceId;
+      token.workspaceRole = fallbackMembership.role;
+      return token;
+    },
+    async session({ session, token }) {
+      if (!session.user || !token.sub || !token.workspaceId || !token.workspaceRole) {
         return session;
       }
 
-      session.user.id = user.id;
-      session.user.workspaceId = fallbackMembership.workspaceId;
-      session.user.workspaceRole = fallbackMembership.role;
+      session.user.id = token.sub;
+      session.user.workspaceId = token.workspaceId;
+      session.user.workspaceRole = token.workspaceRole;
       return session;
     },
   },
