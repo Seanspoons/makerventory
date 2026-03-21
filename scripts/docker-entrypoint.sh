@@ -11,7 +11,7 @@ echo "Generating Prisma Client..."
 npm run db:generate
 
 echo "Applying Prisma migrations..."
-npm run db:deploy
+node ./scripts/apply-migrations.mjs
 
 if [ "${SEED_ON_START:-true}" = "true" ]; then
   echo "Checking seed state..."

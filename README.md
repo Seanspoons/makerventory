@@ -80,7 +80,8 @@ What happens on startup:
 - PostgreSQL starts in a dedicated container
 - the app waits for the database to become reachable
 - Prisma Client is generated
-- `prisma migrate deploy` applies committed migrations
+- committed migrations are applied
+- if Docker detects an older local dev volume created before migration history existed, it resets the local schema once and reapplies migrations
 - the seed runs only if the database is empty
 - Next.js starts in development mode with file watching enabled
 
@@ -100,6 +101,7 @@ docker compose down -v
 ```
 
 - Use `docker compose down -v` only if you want to remove the PostgreSQL volume and force a fresh reseed on next startup.
+- The automatic local schema reset is Docker-dev-only and is enabled by `PRISMA_DEV_RESET_ON_P3005=true` in `docker-compose.yml`.
 - PostgreSQL is only exposed inside the Docker network. The app container connects internally on `db:5432`, and no host DB port is published.
 
 ## Prisma Workflow
