@@ -311,6 +311,46 @@ export async function getMaintenanceLogs() {
   });
 }
 
+export async function getImportJobs(selectedId?: string | null) {
+  const workspaceId = await getWorkspaceId();
+  const jobs = await prisma.importJob.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      createdByUser: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+    take: 12,
+  });
+
+  const selectedJobId = selectedId && jobs.some((job) => job.id === selectedId) ? selectedId : jobs[0]?.id;
+  const selectedJob = selectedJobId
+    ? await prisma.importJob.findFirst({
+        where: { id: selectedJobId, workspaceId },
+        include: {
+          createdByUser: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+          rows: {
+            orderBy: { rowIndex: "asc" },
+          },
+        },
+      })
+    : null;
+
+  return {
+    jobs,
+    selectedJob,
+  };
+}
+
 export const wishlistPriorityOrder: WishlistPriority[] = [
   "CRITICAL",
   "HIGH",

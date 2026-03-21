@@ -1,5 +1,5 @@
 import type { Route } from "next";
-import { Layers3, Package, ShieldCheck, ShoppingCart, Wrench } from "lucide-react";
+import { DatabaseZap, Layers3, Package, ShieldCheck, ShoppingCart, Wrench } from "lucide-react";
 
 export const navigation = [
   {
@@ -20,6 +20,7 @@ export const navigation = [
       { label: "Tools / Parts", href: "/tools-parts" as Route, icon: Wrench },
       { label: "Wishlist", href: "/wishlist" as Route, icon: ShoppingCart },
       { label: "Maintenance Logs", href: "/maintenance" as Route, icon: Wrench },
+      { label: "Imports", href: "/imports" as Route, icon: DatabaseZap },
     ],
   },
 ];

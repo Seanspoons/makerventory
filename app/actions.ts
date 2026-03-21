@@ -2,6 +2,7 @@
 
 import {
   FilamentHygroscopicLevel,
+  ImportEntityType,
   MaterialSystemType,
   MaintenanceActionType,
   StockStatus,
@@ -10,6 +11,13 @@ import {
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import { setFlashMessage } from "@/lib/flash";
+import {
+  applyImportJobRows,
+  createImportJobWithRows,
+  importEntityOptions,
+  readCsvFile,
+  stageImportRecords,
+} from "@/lib/imports";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 
@@ -35,6 +43,7 @@ function numberValue(formData: FormData, key: string, fallback = 0) {
 function revalidateInventory() {
   [
     "/",
+    "/imports",
     "/printers",
     "/material-systems",
     "/build-plates",
@@ -47,6 +56,16 @@ function revalidateInventory() {
     "/wishlist",
     "/maintenance",
   ].forEach((path) => revalidatePath(path));
+}
+
+function importEntityValue(formData: FormData, key = "entityType") {
+  const value = requiredString(formData, key);
+  const allowed = new Set(importEntityOptions.map((option) => option.value));
+  if (!allowed.has(value as ImportEntityType)) {
+    throw new Error("Unsupported import entity type.");
+  }
+
+  return value as ImportEntityType;
 }
 
 function booleanValue(formData: FormData, key: string) {
@@ -636,4 +655,50 @@ export async function createMaintenanceLog(formData: FormData) {
   });
   revalidatePath("/maintenance");
   revalidatePath("/");
+}
+
+export async function stageImportJob(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const entityType = importEntityValue(formData);
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    throw new Error("A CSV file is required.");
+  }
+
+  const sourceName = optionalString(formData, "sourceName") ?? file.name.replace(/\.csv$/i, "");
+  const notes = optionalString(formData, "notes");
+  const records = await readCsvFile(file);
+  const rows = await stageImportRecords(workspaceId, entityType, records);
+
+  const job = await createImportJobWithRows({
+    workspaceId,
+    userId,
+    entityType,
+    sourceName,
+    originalFilename: file.name,
+    notes,
+    rows,
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Import staged",
+    message: `${job.totalRows} row(s) staged for review before apply.`,
+  });
+  revalidatePath("/imports");
+}
+
+export async function applyStagedImport(formData: FormData) {
+  const { workspaceId } = await getWorkspaceContext();
+  const jobId = requiredString(formData, "jobId");
+
+  const job = await applyImportJobRows(jobId, workspaceId);
+
+  await setFlashMessage({
+    type: "success",
+    title: "Import applied",
+    message: `${job.entityType.toLowerCase().replace("_", " ")} records were written to inventory.`,
+  });
+  revalidateInventory();
 }

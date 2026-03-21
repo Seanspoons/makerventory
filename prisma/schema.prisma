@@ -102,6 +102,28 @@ enum FilamentHygroscopicLevel {
   HIGH
 }
 
+enum ImportEntityType {
+  FILAMENT
+  CONSUMABLE
+  TOOL_PART
+  WISHLIST
+}
+
+enum ImportJobStatus {
+  STAGED
+  APPLIED
+  FAILED
+}
+
+enum ImportRowStatus {
+  NEW
+  MATCHED
+  CONFLICT
+  SKIPPED
+  APPLIED
+  ERROR
+}
+
 model User {
   id                String            @id @default(cuid())
   name              String?
@@ -115,6 +137,7 @@ model User {
   memberships       WorkspaceMember[]
   accounts          Account[]
   sessions          Session[]
+  importJobs        ImportJob[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 }
@@ -137,6 +160,8 @@ model Workspace {
   toolsParts      ToolPart[]
   wishlistItems   WishlistItem[]
   maintenanceLogs MaintenanceLog[]
+  importJobs      ImportJob[]
+  importRows      ImportRow[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -186,6 +211,52 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+model ImportJob {
+  id               String          @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  createdByUser    User            @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  entityType       ImportEntityType
+  status           ImportJobStatus @default(STAGED)
+  sourceName       String
+  originalFilename String
+  notes            String?         @db.Text
+  totalRows        Int             @default(0)
+  newRows          Int             @default(0)
+  matchedRows      Int             @default(0)
+  conflictRows     Int             @default(0)
+  skippedRows      Int             @default(0)
+  appliedAt        DateTime?
+  rows             ImportRow[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([workspaceId, createdAt])
+}
+
+model ImportRow {
+  id                 String          @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  importJobId        String
+  importJob          ImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  rowIndex           Int
+  entityType         ImportEntityType
+  status             ImportRowStatus @default(NEW)
+  fingerprint        String
+  suggestedMatchId   String?
+  suggestedMatchSlug String?
+  data               Json
+  validationErrors   String[]
+  appliedAt          DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([importJobId, rowIndex])
+  @@index([workspaceId, status])
 }
 
 model Printer {
