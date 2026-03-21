@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   title: "Makerventory",
   description: "3D Printing Inventory and Operations Manager",
   icons: {
-    icon: "/brand/makerventory-mark-dark.svg",
-    shortcut: "/brand/makerventory-mark-dark.svg",
-    apple: "/brand/makerventory-mark-dark.png",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
   },
 };
 
