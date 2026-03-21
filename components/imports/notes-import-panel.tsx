@@ -183,44 +183,49 @@ export function NotesImportPanel({
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3">
-                  {group.rows.slice(0, 4).map((row) => (
-                    <div
-                      key={`${group.groupKey}-${row.rowIndex}`}
-                      className={cn(
-                        "rounded-2xl border p-3",
-                        row.status === "ERROR" || row.status === "CONFLICT"
-                          ? "border-rose-200 bg-rose-50/70"
-                          : "border-slate-200 bg-slate-50/70",
-                      )}
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {row.suggestedMatchSlug
-                              ? `Suggested match: ${row.suggestedMatchSlug}`
-                              : "New record candidate"}
-                          </p>
+                <details className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/70">
+                  <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                    Preview parsed rows
+                  </summary>
+                  <div className="space-y-3 border-t border-slate-200 p-4">
+                    {group.rows.slice(0, 4).map((row) => (
+                      <div
+                        key={`${group.groupKey}-${row.rowIndex}`}
+                        className={cn(
+                          "rounded-2xl border p-3",
+                          row.status === "ERROR" || row.status === "CONFLICT"
+                            ? "border-rose-200 bg-rose-50/70"
+                            : "border-slate-200 bg-white",
+                        )}
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {row.suggestedMatchSlug
+                                ? `Suggested match: ${row.suggestedMatchSlug}`
+                                : "New record candidate"}
+                            </p>
+                          </div>
+                          <StatusBadge value={row.status} />
                         </div>
-                        <StatusBadge value={row.status} />
+                        {row.validationErrors.length > 0 ? (
+                          <div className="mt-3 text-sm text-rose-800">
+                            {row.validationErrors.join(" · ")}
+                          </div>
+                        ) : null}
+                        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                          {JSON.stringify(row.data, null, 2)}
+                        </pre>
                       </div>
-                      {row.validationErrors.length > 0 ? (
-                        <div className="mt-3 text-sm text-rose-800">
-                          {row.validationErrors.join(" · ")}
-                        </div>
-                      ) : null}
-                      <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                        {JSON.stringify(row.data, null, 2)}
-                      </pre>
-                    </div>
-                  ))}
-                  {group.rows.length > 4 ? (
-                    <p className="text-sm text-slate-500">
-                      Showing 4 of {group.rows.length} rows in preview. Full control is available after staging.
-                    </p>
-                  ) : null}
-                </div>
+                    ))}
+                    {group.rows.length > 4 ? (
+                      <p className="text-sm text-slate-500">
+                        Showing 4 of {group.rows.length} rows in preview. Full control is available after staging.
+                      </p>
+                    ) : null}
+                  </div>
+                </details>
               </div>
             );
           })}

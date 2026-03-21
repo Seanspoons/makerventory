@@ -22,6 +22,33 @@ function attentionTone(kind: "warning" | "neutral" | "action") {
 export default async function DashboardPage() {
   const data = await getDashboardData();
   const hasInventory = data.onboardingState.hasInventory;
+  const primaryNextStep = !hasInventory
+    ? {
+        label: "Finish workshop setup",
+        body: "Choose the fastest path in, add your first printer, and come back to a simplified control center.",
+        href: "/welcome" as Route,
+        cta: "Open onboarding",
+      }
+    : data.stagedImportJobs.length > 0
+      ? {
+          label: "Review staged imports",
+          body: "Staged jobs are waiting for review or apply. Clear those first so the rest of the workspace reflects current data.",
+          href: "/imports#staged-job" as Route,
+          cta: "Open staged review",
+        }
+      : data.totals.lowStockItems > 0
+        ? {
+            label: "Resolve stock alerts",
+            body: "Low filament or consumables are now the clearest operational risk in the workshop.",
+            href: "/filament" as Route,
+            cta: "Review stock",
+          }
+        : {
+            label: "Keep workshop records moving",
+            body: "Capture new stock, maintenance, or purchase planning before it falls out of date.",
+            href: "/maintenance" as Route,
+            cta: "Log maintenance",
+          };
   const attentionCards = [
     {
       title: "Low stock",
@@ -234,10 +261,23 @@ export default async function DashboardPage() {
 
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <SectionCard
-          title="Quick actions"
-          description="Common daily actions are surfaced here first so you do not need to hunt through the full app."
+          title="What to do next"
+          description="One strong next step first, with the rest of the common actions kept close by."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-[24px] border border-slate-900 bg-slate-950 p-5 text-white">
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Recommended</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight">{primaryNextStep.label}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{primaryNextStep.body}</p>
+            <div className="mt-4">
+              <Button asChild className="!text-white [&_svg]:!text-white">
+                <Link href={primaryNextStep.href}>
+                  {primaryNextStep.cta}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {quickActions.map((item) => {
               const Icon = item.icon;
               return (
@@ -337,6 +377,19 @@ export default async function DashboardPage() {
           description="A compact view of import review and maintenance activity, with the details kept one click away."
         >
           <div className="space-y-3">
+            {data.stagedImportJobs.length > 0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                <p className="font-medium text-slate-950">Imports waiting for review</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {data.stagedImportJobs.length} staged job{data.stagedImportJobs.length === 1 ? "" : "s"} are still unresolved.
+                </p>
+                <div className="mt-3">
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href="/imports#staged-job">Open staged review</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {data.stagedImportJobs.slice(0, 3).map((job) => (
               <Link
                 key={job.id}

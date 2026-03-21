@@ -96,6 +96,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
     ) ?? [];
   const skippedRows =
     selectedJob?.rows.filter((row) => row.status === ImportRowStatus.SKIPPED) ?? [];
+  const appliedJobCount = jobs.filter((job) => job.status === "APPLIED").length;
   const filteredRows =
     selectedJob?.rows.filter((row) => {
       if (selectedRowFilter === "all") return true;
@@ -120,10 +121,52 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         description="Stage real workshop data into a review queue before it touches inventory. Imports are workspace-scoped, row-level validated, and applied only after explicit confirmation."
         action={
           <div className="w-full rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:w-auto">
-            {jobs.length} recent import job{jobs.length === 1 ? "" : "s"}
+            {stagedJobs.length > 0
+              ? `${stagedJobs.length} staged job${stagedJobs.length === 1 ? "" : "s"} need review`
+              : `${jobs.length} recent import job${jobs.length === 1 ? "" : "s"}`}
           </div>
         }
       />
+
+      <SectionCard
+        title="Import at a glance"
+        description="Start with one import path, then review staged jobs once they are ready."
+      >
+        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-[24px] border border-slate-900 bg-slate-950 p-5 text-white">
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Recommended next step</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight">
+              {stagedJobs.length > 0 ? "Finish reviewing staged imports" : "Choose the format you already have"}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              {stagedJobs.length > 0
+                ? "Resolve blocked rows, confirm matched updates, and apply the ready rows once the change set looks clean."
+                : "Use CSV when your data already has columns. Use Notes import when your inventory still lives in Apple Notes or structured text."}
+            </p>
+            <div className="mt-4">
+              <Button asChild className="!text-white [&_svg]:!text-white">
+                <Link href={stagedJobs.length > 0 ? "#staged-job" : "#notes-import"}>
+                  {stagedJobs.length > 0 ? "Go to staged review" : "Start notes import"}
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-sm text-slate-500">Staged jobs</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{stagedJobs.length}</p>
+            </div>
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-sm text-slate-500">Applied jobs</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{appliedJobCount}</p>
+            </div>
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-sm text-slate-500">Ready rows in selection</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{actionableRows.length}</p>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Choose import method"
@@ -269,37 +312,37 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         </div>
       </div>
 
-      <SectionCard
-        title="Review checklist"
-        description="Treat staged imports as a controlled change set. Resolve conflicts before apply and keep notes about how the source data was normalized."
-      >
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+      <details className="rounded-[28px] border border-slate-200 bg-white">
+        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-slate-950 sm:px-6">
+          How import review works
+        </summary>
+        <div className="grid gap-4 border-t border-slate-100 p-5 lg:grid-cols-2 xl:grid-cols-4 sm:p-6">
+          <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
             <p className="font-medium text-slate-950">Before apply</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Confirm matched rows are true updates, not accidental collisions from overly broad names.
             </p>
           </div>
-          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+          <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
             <p className="font-medium text-slate-950">Conflicts</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Rows marked <span className="font-medium text-rose-700">Conflict</span> or <span className="font-medium text-rose-700">Error</span> will not apply. Clean the source and re-stage.
             </p>
           </div>
-          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+          <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
             <p className="font-medium text-slate-950">Notes paste path</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               One pasted note can stage multiple jobs, grouped by section, so you can review each inventory domain separately.
             </p>
           </div>
-          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+          <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
             <p className="font-medium text-slate-950">Per-row control</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Skip rows you do not want applied yet, then re-queue or switch them to create-vs-update without re-uploading everything.
             </p>
           </div>
         </div>
-      </SectionCard>
+      </details>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(360px,0.95fr)_minmax(0,1.25fr)] xl:items-start">
         <SectionCard
@@ -433,45 +476,54 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   ) : null}
                 </div>
                 {selectedJob.status === "STAGED" ? (
-                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-                    <form action={updateImportJobRowsBulk}>
-                      <input type="hidden" name="jobId" value={selectedJob.id} />
-                      <input type="hidden" name="operation" value="set_matched_update" />
-                      <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
-                        Update all matched ({selectedJob.matchedRows})
-                      </SubmitButton>
-                    </form>
-                    <form action={updateImportJobRowsBulk}>
-                      <input type="hidden" name="jobId" value={selectedJob.id} />
-                      <input type="hidden" name="operation" value="set_unmatched_create" />
-                      <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
-                        Create all unmatched ({selectedJob.newRows})
-                      </SubmitButton>
-                    </form>
-                    <form action={updateImportJobRowsBulk}>
-                      <input type="hidden" name="jobId" value={selectedJob.id} />
-                      <input type="hidden" name="operation" value="skip_ready" />
-                      <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
-                        Skip all ready ({actionableRows.length})
-                      </SubmitButton>
-                    </form>
-                    <ConfirmActionForm
-                      action={applyStagedImport}
-                      title="Apply staged import"
-                      description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
-                      confirmLabel="Apply import"
-                      triggerLabel="Apply all ready rows"
-                      triggerVariant="secondary"
-                    >
-                      <input type="hidden" name="jobId" value={selectedJob.id} />
-                      <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
-                        {actionableRows.length} row(s) are eligible to apply in this job.
+                  <div className="w-full sm:w-auto">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                      <ConfirmActionForm
+                        action={applyStagedImport}
+                        title="Apply staged import"
+                        description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
+                        confirmLabel="Apply import"
+                        triggerLabel="Apply all ready rows"
+                        triggerVariant="secondary"
+                      >
+                        <input type="hidden" name="jobId" value={selectedJob.id} />
+                        <input type="hidden" name="returnTo" value={selectedJobHref} />
+                        <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                          {actionableRows.length} row(s) are eligible to apply in this job.
+                        </div>
+                      </ConfirmActionForm>
+                    </div>
+                    <details className="mt-3 rounded-[18px] border border-slate-200 bg-white">
+                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-950">
+                        Batch row decisions
+                      </summary>
+                      <div className="grid gap-2 border-t border-slate-100 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <form action={updateImportJobRowsBulk}>
+                          <input type="hidden" name="jobId" value={selectedJob.id} />
+                          <input type="hidden" name="operation" value="set_matched_update" />
+                          <input type="hidden" name="returnTo" value={selectedJobHref} />
+                          <SubmitButton variant="secondary" size="sm" className="w-full">
+                            Update all matched ({selectedJob.matchedRows})
+                          </SubmitButton>
+                        </form>
+                        <form action={updateImportJobRowsBulk}>
+                          <input type="hidden" name="jobId" value={selectedJob.id} />
+                          <input type="hidden" name="operation" value="set_unmatched_create" />
+                          <input type="hidden" name="returnTo" value={selectedJobHref} />
+                          <SubmitButton variant="secondary" size="sm" className="w-full">
+                            Create all unmatched ({selectedJob.newRows})
+                          </SubmitButton>
+                        </form>
+                        <form action={updateImportJobRowsBulk}>
+                          <input type="hidden" name="jobId" value={selectedJob.id} />
+                          <input type="hidden" name="operation" value="skip_ready" />
+                          <input type="hidden" name="returnTo" value={selectedJobHref} />
+                          <SubmitButton variant="secondary" size="sm" className="w-full">
+                            Skip all ready ({actionableRows.length})
+                          </SubmitButton>
+                        </form>
                       </div>
-                    </ConfirmActionForm>
+                    </details>
                   </div>
                 ) : (
                   <Button type="button" variant="secondary" disabled>
