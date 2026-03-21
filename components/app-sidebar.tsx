@@ -3,11 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Sparkles } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { LogOut, Search, Sparkles } from "lucide-react";
 import { navigation } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-export function AppSidebar() {
+export function AppSidebar({
+  workspaceName,
+  userEmail,
+}: {
+  workspaceName: string;
+  userEmail: string;
+}) {
   const pathname = usePathname();
 
   return (
@@ -41,7 +48,7 @@ export function AppSidebar() {
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-slate-300">
           <Search className="h-4 w-4" />
-          Search inventory, maintenance, and purchase plans
+          {workspaceName}
         </div>
       </div>
 
@@ -96,6 +103,19 @@ export function AppSidebar() {
           Structured for telemetry, QR labels, smart-plug automation, and spool
           consumption tracking.
         </p>
+      </div>
+
+      <div className="mt-4 rounded-[26px] border border-white/10 bg-white/5 p-4">
+        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Session</p>
+        <p className="mt-2 truncate text-sm text-slate-200">{userEmail}</p>
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/sign-in" })}
+          className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/8 hover:text-white"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
       </div>
     </aside>
   );

@@ -8,6 +8,7 @@ import {
   WishlistPriority,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "@/lib/auth";
 import { setFlashMessage } from "@/lib/flash";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
@@ -52,14 +53,53 @@ function booleanValue(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
 }
 
+async function getWorkspaceContext() {
+  const session = await requireSession();
+  return {
+    userId: session.user.id,
+    workspaceId: session.user.workspaceId,
+  };
+}
+
+async function assertOwnedRecord(kind: string, id: string, workspaceId: string) {
+  switch (kind) {
+    case "printer":
+      return prisma.printer.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "material-system":
+      return prisma.materialSystem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "build-plate":
+      return prisma.buildPlate.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "hotend":
+      return prisma.hotend.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "filament":
+      return prisma.filamentSpool.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "consumable":
+      return prisma.consumableItem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "safety":
+      return prisma.safetyEquipment.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "smart-plug":
+      return prisma.smartPlug.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "tool":
+      return prisma.toolPart.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "wishlist":
+      return prisma.wishlistItem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    case "maintenance":
+      return prisma.maintenanceLog.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    default:
+      return null;
+  }
+}
+
 export async function createInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
+  const { workspaceId } = await getWorkspaceContext();
 
   switch (kind) {
     case "printer": {
       const name = requiredString(formData, "name");
       await prisma.printer.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           brand: requiredString(formData, "brand"),
@@ -77,6 +117,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.materialSystem.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           type: requiredString(formData, "type") as MaterialSystemType,
@@ -90,6 +131,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.buildPlate.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           sizeLabel: requiredString(formData, "sizeLabel"),
@@ -105,6 +147,7 @@ export async function createInventoryItem(formData: FormData) {
       const quantity = numberValue(formData, "quantity", 1);
       await prisma.hotend.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           nozzleSize: numberValue(formData, "nozzleSize", 0.4),
@@ -124,6 +167,7 @@ export async function createInventoryItem(formData: FormData) {
       const dryingRequired = formData.get("dryingRequired") === "on";
       await prisma.filamentSpool.create({
         data: {
+          workspaceId,
           brand,
           materialType,
           color,
@@ -164,6 +208,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.consumableItem.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           category: requiredString(formData, "category"),
@@ -180,6 +225,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.safetyEquipment.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           type: requiredString(formData, "type"),
@@ -193,6 +239,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.smartPlug.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           assignedDeviceLabel: optionalString(formData, "assignedDeviceLabel"),
@@ -206,6 +253,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.toolPart.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           category: requiredString(formData, "category"),
@@ -220,6 +268,7 @@ export async function createInventoryItem(formData: FormData) {
       const name = requiredString(formData, "name");
       await prisma.wishlistItem.create({
         data: {
+          workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
           category: requiredString(formData, "category"),
@@ -247,6 +296,12 @@ export async function createInventoryItem(formData: FormData) {
 export async function updateInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
+  const { workspaceId } = await getWorkspaceContext();
+  const owned = await assertOwnedRecord(kind, id, workspaceId);
+
+  if (!owned) {
+    throw new Error("Unauthorized");
+  }
 
   switch (kind) {
     case "printer":
@@ -467,6 +522,12 @@ export async function updateInventoryItem(formData: FormData) {
 export async function archiveInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
+  const { workspaceId } = await getWorkspaceContext();
+  const owned = await assertOwnedRecord(kind, id, workspaceId);
+
+  if (!owned) {
+    throw new Error("Unauthorized");
+  }
 
   switch (kind) {
     case "printer":
@@ -519,6 +580,12 @@ export async function updateFilamentState(formData: FormData) {
   const opened = formData.get("opened") === "true";
   const nearlyEmpty = formData.get("nearlyEmpty") === "true";
   const estimatedRemainingGrams = numberValue(formData, "estimatedRemainingGrams", 0);
+  const { workspaceId } = await getWorkspaceContext();
+  const owned = await assertOwnedRecord("filament", id, workspaceId);
+
+  if (!owned) {
+    throw new Error("Unauthorized");
+  }
 
   await prisma.filamentSpool.update({
     where: { id },
@@ -542,6 +609,7 @@ export async function updateFilamentState(formData: FormData) {
 export async function createMaintenanceLog(formData: FormData) {
   const assetType = requiredString(formData, "assetType");
   const assetId = optionalString(formData, "assetId");
+  const { workspaceId } = await getWorkspaceContext();
   const data = {
     date: new Date(requiredString(formData, "date")),
     actionType: requiredString(formData, "actionType") as MaintenanceActionType,
@@ -551,6 +619,7 @@ export async function createMaintenanceLog(formData: FormData) {
 
   await prisma.maintenanceLog.create({
     data: {
+      workspaceId,
       ...data,
       ...(assetType === "printer" && assetId ? { printerId: assetId } : {}),
       ...(assetType === "materialSystem" && assetId ? { materialSystemId: assetId } : {}),

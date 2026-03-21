@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 enum PrinterStatus {
   ACTIVE
   MAINTENANCE
@@ -96,72 +102,172 @@ enum FilamentHygroscopicLevel {
   HIGH
 }
 
+model User {
+  id                String            @id @default(cuid())
+  name              String?
+  email             String            @unique
+  emailVerified     DateTime?
+  image             String?
+  passwordHash      String?
+  isActive          Boolean           @default(true)
+  activeWorkspaceId String?
+  activeWorkspace   Workspace?        @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
+  memberships       WorkspaceMember[]
+  accounts          Account[]
+  sessions          Session[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Workspace {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  description     String?           @db.Text
+  activeUsers     User[]            @relation("ActiveWorkspace")
+  memberships     WorkspaceMember[]
+  printers        Printer[]
+  materialSystems MaterialSystem[]
+  buildPlates     BuildPlate[]
+  hotends         Hotend[]
+  filamentSpools  FilamentSpool[]
+  consumables     ConsumableItem[]
+  safetyEquipment SafetyEquipment[]
+  smartPlugs      SmartPlug[]
+  toolsParts      ToolPart[]
+  wishlistItems   WishlistItem[]
+  maintenanceLogs MaintenanceLog[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
 model Printer {
-  id                 String                    @id @default(cuid())
-  name               String
-  slug               String                    @unique
-  brand              String
-  model              String
-  status             PrinterStatus             @default(ACTIVE)
-  buildVolumeX       Int
-  buildVolumeY       Int
-  buildVolumeZ       Int
-  location           String?
-  notes              String?                   @db.Text
-  imageUrl           String?
-  smartPlugId        String?                   @unique
-  smartPlug          SmartPlug?                @relation(fields: [smartPlugId], references: [id])
-  installedHotendId  String?                   @unique
-  installedHotend    Hotend?                   @relation("InstalledHotend", fields: [installedHotendId], references: [id])
-  installedPlateId   String?                   @unique
-  installedPlate     BuildPlate?               @relation("InstalledPlate", fields: [installedPlateId], references: [id])
-  materialSystems    MaterialSystem[]
-  compatiblePlates   PrinterBuildPlate[]
-  compatibleHotends  PrinterHotend[]
-  compatibleMaterialSystems PrinterMaterialSystem[]
-  maintenanceLogs    MaintenanceLog[]
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  id                         String                 @id @default(cuid())
+  workspaceId                String
+  workspace                  Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                       String
+  slug                       String
+  brand                      String
+  model                      String
+  status                     PrinterStatus          @default(ACTIVE)
+  buildVolumeX               Int
+  buildVolumeY               Int
+  buildVolumeZ               Int
+  location                   String?
+  notes                      String?                @db.Text
+  imageUrl                   String?
+  smartPlugId                String?                @unique
+  smartPlug                  SmartPlug?             @relation(fields: [smartPlugId], references: [id])
+  installedHotendId          String?                @unique
+  installedHotend            Hotend?                @relation("InstalledHotend", fields: [installedHotendId], references: [id])
+  installedPlateId           String?                @unique
+  installedPlate             BuildPlate?            @relation("InstalledPlate", fields: [installedPlateId], references: [id])
+  materialSystems            MaterialSystem[]
+  compatiblePlates           PrinterBuildPlate[]
+  compatibleHotends          PrinterHotend[]
+  compatibleMaterialSystems  PrinterMaterialSystem[]
+  maintenanceLogs            MaintenanceLog[]
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model MaterialSystem {
-  id                       String                 @id @default(cuid())
-  name                     String
-  slug                     String                 @unique
-  type                     MaterialSystemType
-  supportedMaterialsNotes  String?                @db.Text
-  status                   MaterialSystemStatus   @default(ACTIVE)
-  notes                    String?                @db.Text
-  imageUrl                 String?
-  assignedPrinterId        String?
-  assignedPrinter          Printer?               @relation(fields: [assignedPrinterId], references: [id])
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
-  maintenanceLogs          MaintenanceLog[]
-  compatiblePrinters       PrinterMaterialSystem[]
+  id                      String               @id @default(cuid())
+  workspaceId             String
+  workspace               Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                    String
+  slug                    String
+  type                    MaterialSystemType
+  supportedMaterialsNotes String?              @db.Text
+  status                  MaterialSystemStatus @default(ACTIVE)
+  notes                   String?              @db.Text
+  imageUrl                String?
+  assignedPrinterId       String?
+  assignedPrinter         Printer?             @relation(fields: [assignedPrinterId], references: [id])
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  maintenanceLogs         MaintenanceLog[]
+  compatiblePrinters      PrinterMaterialSystem[]
+
+  @@unique([workspaceId, slug])
 }
 
 model BuildPlate {
-  id                 String              @id @default(cuid())
+  id                 String             @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name               String
-  slug               String              @unique
+  slug               String
   sizeLabel          String
   sizeMm             Int
   surfaceType        String
-  status             BuildPlateStatus    @default(AVAILABLE)
-  notes              String?             @db.Text
+  status             BuildPlateStatus   @default(AVAILABLE)
+  notes              String?            @db.Text
   imageUrl           String?
   compatiblePrinters PrinterBuildPlate[]
-  installedOnPrinter Printer?            @relation("InstalledPlate")
+  installedOnPrinter Printer?           @relation("InstalledPlate")
   maintenanceLogs    MaintenanceLog[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model Hotend {
   id                 String             @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name               String
-  slug               String             @unique
+  slug               String
   nozzleSize         Decimal            @db.Decimal(4, 2)
   materialType       String
   quantity           Int                @default(1)
@@ -175,66 +281,76 @@ model Hotend {
   maintenanceLogs    MaintenanceLog[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model FilamentSpool {
-  id                      String                  @id @default(cuid())
+  id                      String                    @id @default(cuid())
+  workspaceId             String
+  workspace               Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brand                   String
   productLine             String?
   materialType            String
   subtype                 String?
   finish                  String?
   color                   String
-  quantity                Int                     @default(1)
+  quantity                Int                       @default(1)
   estimatedRemainingGrams Int?
-  spoolWeightGrams        Int?                    @default(1000)
+  spoolWeightGrams        Int?                      @default(1000)
   compatibilityTags       String[]
   dryingRequired          Boolean?
-  abrasive                Boolean?                @default(false)
+  abrasive                Boolean?                  @default(false)
   hygroscopicLevel        FilamentHygroscopicLevel?
   storageLocation         String?
   purchaseSource          String?
-  status                  StockStatus             @default(HEALTHY)
-  opened                  Boolean                 @default(false)
-  nearlyEmpty             Boolean                 @default(false)
-  notes                   String?                 @db.Text
+  status                  StockStatus               @default(HEALTHY)
+  opened                  Boolean                   @default(false)
+  nearlyEmpty             Boolean                   @default(false)
+  notes                   String?                   @db.Text
   imageUrl                String?
   filamentRecommendation  FilamentRecommendation?
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
 }
 
 model FilamentRecommendation {
-  id                    String         @id @default(cuid())
-  filamentId            String         @unique
-  filament              FilamentSpool  @relation(fields: [filamentId], references: [id], onDelete: Cascade)
-  recommendedNozzle     String?
-  dryerSuggested        Boolean        @default(false)
-  hardenedNozzleNeeded  Boolean        @default(false)
-  notes                 String?        @db.Text
+  id                   String        @id @default(cuid())
+  filamentId           String        @unique
+  filament             FilamentSpool @relation(fields: [filamentId], references: [id], onDelete: Cascade)
+  recommendedNozzle    String?
+  dryerSuggested       Boolean       @default(false)
+  hardenedNozzleNeeded Boolean       @default(false)
+  notes                String?       @db.Text
 }
 
 model ConsumableItem {
-  id                String                    @id @default(cuid())
+  id                String                     @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name              String
-  slug              String                    @unique
+  slug              String
   category          String
-  quantity          Decimal                   @db.Decimal(10, 2)
+  quantity          Decimal                    @db.Decimal(10, 2)
   unit              String
-  reorderThreshold  Decimal                   @db.Decimal(10, 2)
-  status            StockStatus               @default(HEALTHY)
+  reorderThreshold  Decimal                    @db.Decimal(10, 2)
+  status            StockStatus                @default(HEALTHY)
   storageLocation   String?
-  notes             String?                   @db.Text
+  notes             String?                    @db.Text
   imageUrl          String?
   maintenanceUsages MaintenanceConsumableUsage[]
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model SafetyEquipment {
   id                  String          @id @default(cuid())
+  workspaceId         String
+  workspace           Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name                String
-  slug                String          @unique
+  slug                String
   type                String
   status              SafetyStatus    @default(ACTIVE)
   replacementSchedule String?
@@ -243,68 +359,84 @@ model SafetyEquipment {
   maintenanceLogs     MaintenanceLog[]
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model SmartPlug {
-  id                     String           @id @default(cuid())
+  id                     String          @id @default(cuid())
+  workspaceId            String
+  workspace              Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name                   String
-  slug                   String           @unique
-  status                 SmartPlugStatus  @default(ONLINE)
+  slug                   String
+  status                 SmartPlugStatus @default(ONLINE)
   assignedDeviceLabel    String?
-  powerMonitoringCapable Boolean          @default(false)
-  notes                  String?          @db.Text
+  powerMonitoringCapable Boolean         @default(false)
+  notes                  String?         @db.Text
   printer                Printer?
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model ToolPart {
-  id               String    @id @default(cuid())
-  name             String
-  slug             String    @unique
-  category         String
-  quantity         Int       @default(1)
-  storageLocation  String?
-  notes            String?   @db.Text
-  imageUrl         String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  slug            String
+  category        String
+  quantity        Int       @default(1)
+  storageLocation String?
+  notes           String?   @db.Text
+  imageUrl        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model WishlistItem {
-  id            String            @id @default(cuid())
+  id            String           @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name          String
-  slug          String            @unique
+  slug          String
   category      String
   priority      WishlistPriority
-  estimatedCost Decimal?          @db.Decimal(10, 2)
+  estimatedCost Decimal?         @db.Decimal(10, 2)
   vendor        String?
   purchaseUrl   String?
-  notes         String?           @db.Text
-  status        WishlistStatus    @default(PLANNED)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  notes         String?          @db.Text
+  status        WishlistStatus   @default(PLANNED)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([workspaceId, slug])
 }
 
 model MaintenanceLog {
-  id                  String                    @id @default(cuid())
-  date                DateTime
-  actionType          MaintenanceActionType
-  actionPerformed     String
-  notes               String?                   @db.Text
-  printerId           String?
-  printer             Printer?                  @relation(fields: [printerId], references: [id])
-  materialSystemId    String?
-  materialSystem      MaterialSystem?           @relation(fields: [materialSystemId], references: [id])
-  buildPlateId        String?
-  buildPlate          BuildPlate?               @relation(fields: [buildPlateId], references: [id])
-  hotendId            String?
-  hotend              Hotend?                   @relation(fields: [hotendId], references: [id])
-  safetyEquipmentId   String?
-  safetyEquipment     SafetyEquipment?          @relation(fields: [safetyEquipmentId], references: [id])
-  consumablesUsed     MaintenanceConsumableUsage[]
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
+  id                String                     @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  date              DateTime
+  actionType        MaintenanceActionType
+  actionPerformed   String
+  notes             String?                    @db.Text
+  printerId         String?
+  printer           Printer?                   @relation(fields: [printerId], references: [id])
+  materialSystemId  String?
+  materialSystem    MaterialSystem?            @relation(fields: [materialSystemId], references: [id])
+  buildPlateId      String?
+  buildPlate        BuildPlate?                @relation(fields: [buildPlateId], references: [id])
+  hotendId          String?
+  hotend            Hotend?                    @relation(fields: [hotendId], references: [id])
+  safetyEquipmentId String?
+  safetyEquipment   SafetyEquipment?           @relation(fields: [safetyEquipmentId], references: [id])
+  consumablesUsed   MaintenanceConsumableUsage[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 }
 
 model MaintenanceConsumableUsage {
@@ -318,23 +450,23 @@ model MaintenanceConsumableUsage {
 }
 
 model PrinterBuildPlate {
-  id          String     @id @default(cuid())
-  printerId   String
+  id           String     @id @default(cuid())
+  printerId    String
   buildPlateId String
-  notes       String?
-  printer     Printer    @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  buildPlate  BuildPlate @relation(fields: [buildPlateId], references: [id], onDelete: Cascade)
+  notes        String?
+  printer      Printer    @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  buildPlate   BuildPlate @relation(fields: [buildPlateId], references: [id], onDelete: Cascade)
 
   @@unique([printerId, buildPlateId])
 }
 
 model PrinterHotend {
-  id         String   @id @default(cuid())
-  printerId  String
-  hotendId   String
-  notes      String?
-  printer    Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
-  hotend     Hotend   @relation(fields: [hotendId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  printerId String
+  hotendId  String
+  notes     String?
+  printer   Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  hotend    Hotend   @relation(fields: [hotendId], references: [id], onDelete: Cascade)
 
   @@unique([printerId, hotendId])
 }

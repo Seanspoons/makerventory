@@ -5,9 +5,16 @@ import {
   WishlistStatus,
 } from "@prisma/client";
 import { subDays } from "date-fns";
+import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+async function getWorkspaceId() {
+  const session = await requireSession();
+  return session.user.workspaceId;
+}
+
 export async function getDashboardData() {
+  const workspaceId = await getWorkspaceId();
   const [
     totalPrinters,
     activePrinters,
@@ -27,21 +34,24 @@ export async function getDashboardData() {
     filamentByMaterial,
     wishlistByPriority,
   ] = await Promise.all([
-    prisma.printer.count(),
-    prisma.printer.count({ where: { status: "ACTIVE" } }),
-    prisma.filamentSpool.aggregate({ _sum: { quantity: true } }),
+    prisma.printer.count({ where: { workspaceId } }),
+    prisma.printer.count({ where: { workspaceId, status: "ACTIVE" } }),
+    prisma.filamentSpool.aggregate({ where: { workspaceId }, _sum: { quantity: true } }),
     prisma.filamentSpool.findMany({
       where: {
+        workspaceId,
         OR: [{ status: StockStatus.LOW }, { nearlyEmpty: true }],
       },
       orderBy: [{ nearlyEmpty: "desc" }, { estimatedRemainingGrams: "asc" }],
       take: 8,
     }),
     prisma.consumableItem.findMany({
+      where: { workspaceId },
       orderBy: [{ status: "desc" }, { quantity: "asc" }],
     }),
     prisma.wishlistItem.count({
       where: {
+        workspaceId,
         status: {
           not: WishlistStatus.PURCHASED,
         },
@@ -49,12 +59,14 @@ export async function getDashboardData() {
     }),
     prisma.maintenanceLog.count({
       where: {
+        workspaceId,
         date: {
           gte: subDays(new Date(), 30),
         },
       },
     }),
     prisma.maintenanceLog.findMany({
+      where: { workspaceId },
       orderBy: { date: "desc" },
       take: 6,
       include: {
@@ -66,12 +78,15 @@ export async function getDashboardData() {
       },
     }),
     prisma.smartPlug.findMany({
+      where: { workspaceId },
       orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
     prisma.safetyEquipment.findMany({
+      where: { workspaceId },
       orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
     prisma.printer.findMany({
+      where: { workspaceId },
       orderBy: { name: "asc" },
       include: {
         installedHotend: true,
@@ -80,19 +95,20 @@ export async function getDashboardData() {
         materialSystems: true,
       },
     }),
-    prisma.materialSystem.findMany(),
-    prisma.buildPlate.findMany(),
-    prisma.hotend.findMany(),
-    prisma.toolPart.findMany(),
+    prisma.materialSystem.findMany({ where: { workspaceId } }),
+    prisma.buildPlate.findMany({ where: { workspaceId } }),
+    prisma.hotend.findMany({ where: { workspaceId } }),
+    prisma.toolPart.findMany({ where: { workspaceId } }),
     prisma.filamentSpool.groupBy({
+      where: { workspaceId },
       by: ["materialType"],
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: "desc" } },
     }),
     prisma.wishlistItem.groupBy({
+      where: { workspaceId, status: { not: WishlistStatus.PURCHASED } },
       by: ["priority"],
       _count: { _all: true },
-      where: { status: { not: WishlistStatus.PURCHASED } },
     }),
   ]);
 
@@ -158,14 +174,17 @@ export const printerDetailInclude = {
 } satisfies Prisma.PrinterInclude;
 
 export async function getPrinterBySlug(slug: string) {
-  return prisma.printer.findUnique({
-    where: { slug },
+  const workspaceId = await getWorkspaceId();
+  return prisma.printer.findFirst({
+    where: { workspaceId, slug },
     include: printerDetailInclude,
   });
 }
 
 export async function getPrinters() {
+  const workspaceId = await getWorkspaceId();
   return prisma.printer.findMany({
+    where: { workspaceId },
     orderBy: { name: "asc" },
     include: {
       smartPlug: true,
@@ -181,7 +200,9 @@ export async function getPrinters() {
 }
 
 export async function getMaterialSystems() {
+  const workspaceId = await getWorkspaceId();
   return prisma.materialSystem.findMany({
+    where: { workspaceId },
     orderBy: { name: "asc" },
     include: {
       assignedPrinter: true,
@@ -192,7 +213,9 @@ export async function getMaterialSystems() {
 }
 
 export async function getBuildPlates() {
+  const workspaceId = await getWorkspaceId();
   return prisma.buildPlate.findMany({
+    where: { workspaceId },
     orderBy: [{ sizeMm: "asc" }, { name: "asc" }],
     include: {
       installedOnPrinter: true,
@@ -203,7 +226,9 @@ export async function getBuildPlates() {
 }
 
 export async function getHotends() {
+  const workspaceId = await getWorkspaceId();
   return prisma.hotend.findMany({
+    where: { workspaceId },
     orderBy: [{ name: "asc" }],
     include: {
       installedOnPrinter: true,
@@ -214,7 +239,9 @@ export async function getHotends() {
 }
 
 export async function getFilament() {
+  const workspaceId = await getWorkspaceId();
   return prisma.filamentSpool.findMany({
+    where: { workspaceId },
     orderBy: [{ materialType: "asc" }, { brand: "asc" }, { color: "asc" }],
     include: {
       filamentRecommendation: true,
@@ -223,13 +250,17 @@ export async function getFilament() {
 }
 
 export async function getConsumables() {
+  const workspaceId = await getWorkspaceId();
   return prisma.consumableItem.findMany({
+    where: { workspaceId },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 }
 
 export async function getSafetyEquipment() {
+  const workspaceId = await getWorkspaceId();
   return prisma.safetyEquipment.findMany({
+    where: { workspaceId },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     include: {
       maintenanceLogs: { orderBy: { date: "desc" }, take: 3 },
@@ -238,7 +269,9 @@ export async function getSafetyEquipment() {
 }
 
 export async function getSmartPlugs() {
+  const workspaceId = await getWorkspaceId();
   return prisma.smartPlug.findMany({
+    where: { workspaceId },
     orderBy: { name: "asc" },
     include: {
       printer: true,
@@ -247,19 +280,25 @@ export async function getSmartPlugs() {
 }
 
 export async function getTools() {
+  const workspaceId = await getWorkspaceId();
   return prisma.toolPart.findMany({
+    where: { workspaceId },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 }
 
 export async function getWishlist() {
+  const workspaceId = await getWorkspaceId();
   return prisma.wishlistItem.findMany({
+    where: { workspaceId },
     orderBy: [{ priority: "desc" }, { status: "asc" }, { name: "asc" }],
   });
 }
 
 export async function getMaintenanceLogs() {
+  const workspaceId = await getWorkspaceId();
   return prisma.maintenanceLog.findMany({
+    where: { workspaceId },
     orderBy: { date: "desc" },
     include: {
       printer: true,
