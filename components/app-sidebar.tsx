@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { CircleUserRound, LogOut, Search, Sparkles } from "lucide-react";
+import { BrandLockup } from "@/components/brand/brand-lockup";
 import { navigation } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -20,29 +20,7 @@ export function AppSidebar({
   return (
     <aside className="sidebar-scroll h-full overflow-y-auto rounded-[30px] border border-slate-200/80 bg-slate-950 px-4 py-5 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-5 sm:py-6">
       <div className="flex items-center gap-3 border-b border-white/10 pb-5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 p-2">
-          <Image
-            src="/brand/makerventory-mark-light.svg"
-            alt="Makerventory mark"
-            width={28}
-            height={28}
-            className="h-7 w-7 drop-shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
-            priority
-          />
-        </div>
-        <div className="min-w-0">
-          <p
-            className="text-[1.75rem] leading-none tracking-[0.04em] text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
-            style={{
-              fontFamily:
-                '"Rajdhani", "DIN Alternate", "Arial Narrow", ui-sans-serif, system-ui, sans-serif',
-            }}
-          >
-            <span className="font-bold">Maker</span>
-            <span className="font-normal">ventory</span>
-          </p>
-          <p className="mt-1 text-sm text-slate-300">Workshop Operations</p>
-        </div>
+        <BrandLockup theme="light" size="compact" subtitle="Workshop Operations" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">

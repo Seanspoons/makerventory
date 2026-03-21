@@ -3,7 +3,7 @@ import { z } from "zod";
 const emailSchema = z.string().trim().toLowerCase().email();
 const passwordSchema = z
   .string()
-  .min(12, "Use at least 12 characters.")
+  .min(12, "Password must be at least 12 characters.")
   .max(256, "Password is too long.");
 
 export const signUpSchema = z

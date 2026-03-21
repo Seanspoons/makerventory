@@ -38,7 +38,7 @@ export default async function ConsumablesPage(props: { searchParams?: SearchPara
       </QuickAddShell>
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[220px] flex-1"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search consumables" /></div>
+          <div className="min-w-0 flex-1 sm:min-w-[220px]"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search consumables" /></div>
           <SubmitButton variant="secondary">Apply filters</SubmitButton>
         </FilterBar>
       </form>

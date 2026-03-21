@@ -67,7 +67,7 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
 
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[260px] flex-1">
+          <div className="min-w-0 flex-1 sm:min-w-[260px]">
             <label className="mb-2 block text-sm text-slate-500">Search</label>
             <Input name="q" defaultValue={q} placeholder="Search printers, location, or notes" />
           </div>
@@ -87,7 +87,7 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <SectionCard title="Printer inventory" description={`${filtered.length} printer records in view.`}>
-          <div className="overflow-hidden rounded-[24px] border border-slate-100">
+          <div className="overflow-x-auto rounded-[24px] border border-slate-100">
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>

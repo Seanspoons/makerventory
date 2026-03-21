@@ -64,7 +64,7 @@ export default async function WishlistPage(props: { searchParams?: SearchParams 
 
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[220px] flex-1">
+          <div className="min-w-0 flex-1 sm:min-w-[220px]">
             <label className="mb-2 block text-sm text-slate-500">Search</label>
             <Input name="q" defaultValue={q} placeholder="Search wishlist" />
           </div>

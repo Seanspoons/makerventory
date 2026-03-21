@@ -40,7 +40,7 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
       </QuickAddShell>
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[220px] flex-1"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search hotends" /></div>
+          <div className="min-w-0 flex-1 sm:min-w-[220px]"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search hotends" /></div>
           <div className="w-full md:w-48"><label className="mb-2 block text-sm text-slate-500">Material</label><Select name="material" defaultValue={material}><option value="ALL">All materials</option><option value="Stainless Steel">Stainless Steel</option><option value="Hardened Steel">Hardened Steel</option></Select></div>
           <SubmitButton variant="secondary">Apply filters</SubmitButton>
         </FilterBar>

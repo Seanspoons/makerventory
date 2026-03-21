@@ -417,7 +417,7 @@ export async function signUpUser(formData: FormData) {
     if (!parsed.success) {
       await setFlashMessage({
         type: "error",
-        title: "Sign-up details need review",
+        title: "Check your sign-up details",
         message: parsed.error.issues[0]?.message ?? "Check the sign-up form and try again.",
       });
       redirect("/sign-up");

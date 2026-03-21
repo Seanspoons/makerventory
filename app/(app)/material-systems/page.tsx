@@ -45,7 +45,7 @@ export default async function MaterialSystemsPage(props: { searchParams?: Search
       </QuickAddShell>
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[220px] flex-1"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search systems" /></div>
+          <div className="min-w-0 flex-1 sm:min-w-[220px]"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search systems" /></div>
           <div className="w-full md:w-48"><label className="mb-2 block text-sm text-slate-500">Type</label><Select name="type" defaultValue={type}><option value="ALL">All types</option><option value="AMS_LITE">AMS Lite</option><option value="AMS_2_PRO">AMS 2 Pro</option><option value="AMS_HT">AMS HT</option><option value="DRYER">Dryer</option></Select></div>
           <SubmitButton variant="secondary">Apply filters</SubmitButton>
         </FilterBar>

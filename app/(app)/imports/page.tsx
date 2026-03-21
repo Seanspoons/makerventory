@@ -67,7 +67,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <SectionCard
           title="Stage CSV import"
-          description="Upload a narrow CSV, review the staged rows, then apply it. This keeps real data onboarding deliberate instead of dumping seed-style demo records straight into production tables."
+          description="Upload a focused CSV, review the staged rows, and apply changes deliberately so your workshop data stays clean and organized."
         >
           <div className="mb-5 flex flex-wrap gap-2">
             {importEntityOptions.map((option) => (
@@ -147,7 +147,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
             <div className="rounded-[22px] border border-slate-200 bg-white p-4">
               <p className="font-medium text-slate-950">Production path</p>
               <p className="mt-2">
-                This is the first step away from demo-only seed data. The target is repeatable import and reconciliation for your actual workshop system of record.
+                Use staged imports to bring in real workshop data carefully, review each row, and avoid messy bulk changes.
               </p>
             </div>
             <div className="rounded-[22px] border border-slate-200 bg-white p-4">

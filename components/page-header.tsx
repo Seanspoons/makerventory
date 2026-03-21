@@ -25,7 +25,7 @@ export function PageHeader({
         </p>
       </div>
       {action ?? (
-        <Button variant="secondary" type="button">
+        <Button variant="secondary" type="button" className="w-full sm:w-auto">
           Quick Add
         </Button>
       )}

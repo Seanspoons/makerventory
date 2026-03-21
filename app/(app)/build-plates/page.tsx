@@ -40,7 +40,7 @@ export default async function BuildPlatesPage(props: { searchParams?: SearchPara
       </QuickAddShell>
       <form className="space-y-5">
         <FilterBar>
-          <div className="min-w-[220px] flex-1"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search plates" /></div>
+          <div className="min-w-0 flex-1 sm:min-w-[220px]"><label className="mb-2 block text-sm text-slate-500">Search</label><Input name="q" defaultValue={q} placeholder="Search plates" /></div>
           <div className="w-full md:w-48"><label className="mb-2 block text-sm text-slate-500">Size</label><Select name="size" defaultValue={size}><option value="ALL">All sizes</option><option value="180mm">180mm</option><option value="256mm">256mm</option></Select></div>
           <SubmitButton variant="secondary">Apply filters</SubmitButton>
         </FilterBar>

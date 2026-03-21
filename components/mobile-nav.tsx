@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
+import { BrandLockup } from "@/components/brand/brand-lockup";
 import {
   Dialog,
   DialogClose,
@@ -26,41 +26,17 @@ export function MobileNav({
 
   return (
     <div className="lg:hidden">
-      <div className="flex items-center justify-between rounded-[24px] border border-slate-200/80 bg-white/90 px-4 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 p-2">
-            <Image
-              src="/brand/makerventory-mark-light.svg"
-              alt="Makerventory mark"
-              width={24}
-              height={24}
-              className="h-6 w-6"
-              priority
-            />
-          </div>
-          <div className="min-w-0">
-            <p
-              className="text-xl leading-none tracking-[0.04em] text-slate-950"
-              style={{
-                fontFamily:
-                  '"Rajdhani", "DIN Alternate", "Arial Narrow", ui-sans-serif, system-ui, sans-serif',
-              }}
-            >
-              <span className="font-bold">Maker</span>
-              <span className="font-normal">ventory</span>
-            </p>
-            <p className="truncate text-xs text-slate-500">{workspaceName}</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-3 rounded-[24px] border border-slate-200/80 bg-white/90 px-3 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
+        <BrandLockup theme="dark" size="compact" subtitle={workspaceName} />
 
         <Dialog>
           <DialogTrigger asChild>
-            <Button type="button" variant="secondary" size="sm">
+            <Button type="button" variant="secondary" size="sm" className="shrink-0">
               <Menu className="h-4 w-4" />
               Menu
             </Button>
           </DialogTrigger>
-          <DialogContent className="left-auto right-4 top-4 w-[calc(100vw-2rem)] max-w-sm translate-x-0 translate-y-0 rounded-[28px] p-0">
+          <DialogContent className="left-auto right-2 top-2 w-[calc(100vw-1rem)] max-w-sm translate-x-0 translate-y-0 rounded-[28px] p-0 sm:right-4 sm:top-4 sm:w-[calc(100vw-2rem)]">
             <div className="rounded-[28px] bg-slate-950 p-5 text-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -102,7 +78,7 @@ export function MobileNav({
                                   active ? "!text-slate-950" : "text-slate-400",
                                 )}
                               />
-                              <span>{item.label}</span>
+                              <span className="break-words">{item.label}</span>
                             </Link>
                           </DialogClose>
                         );
