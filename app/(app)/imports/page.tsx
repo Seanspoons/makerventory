@@ -26,6 +26,16 @@ import { cn, titleCase } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+const rowStatusFilters = [
+  { value: "all", label: "All rows" },
+  { value: "ready", label: "Ready" },
+  { value: "matched", label: "Matched" },
+  { value: "new", label: "New" },
+  { value: "blocked", label: "Blocked" },
+  { value: "skipped", label: "Skipped" },
+  { value: "applied", label: "Applied" },
+] as const;
+
 function rowTone(status: ImportRowStatus) {
   if (status === ImportRowStatus.ERROR || status === ImportRowStatus.CONFLICT) {
     return "bg-rose-50/70";
@@ -60,17 +70,39 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
   const searchParams = (await props.searchParams) ?? {};
   const selected =
     typeof searchParams.selected === "string" ? searchParams.selected : null;
+  const rowStatusParam =
+    typeof searchParams.rowStatus === "string" ? searchParams.rowStatus : "all";
   const entityTypeParam =
     typeof searchParams.entityType === "string" ? searchParams.entityType : "FILAMENT";
   const selectedEntityType = importEntityOptions.some((option) => option.value === entityTypeParam)
     ? entityTypeParam
     : "FILAMENT";
   const { jobs, selectedJob } = await getImportJobs(selected);
-  const selectedJobHref = selectedJob ? `/imports?selected=${selectedJob.id}#staged-job` : "/imports#staged-job";
+  const selectedRowFilter = rowStatusFilters.some((filter) => filter.value === rowStatusParam)
+    ? rowStatusParam
+    : "all";
+  const selectedJobHref = selectedJob
+    ? `/imports?selected=${selectedJob.id}&rowStatus=${selectedRowFilter}#staged-job`
+    : "/imports#staged-job";
   const actionableRows =
     selectedJob?.rows.filter(
       (row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED,
     ) ?? [];
+  const filteredRows =
+    selectedJob?.rows.filter((row) => {
+      if (selectedRowFilter === "all") return true;
+      if (selectedRowFilter === "ready") {
+        return row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED;
+      }
+      if (selectedRowFilter === "matched") return row.status === ImportRowStatus.MATCHED;
+      if (selectedRowFilter === "new") return row.status === ImportRowStatus.NEW;
+      if (selectedRowFilter === "blocked") {
+        return row.status === ImportRowStatus.CONFLICT || row.status === ImportRowStatus.ERROR;
+      }
+      if (selectedRowFilter === "skipped") return row.status === ImportRowStatus.SKIPPED;
+      if (selectedRowFilter === "applied") return row.status === ImportRowStatus.APPLIED;
+      return true;
+    }) ?? [];
 
   return (
     <div className="space-y-5">
@@ -79,7 +111,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         title="Imports"
         description="Stage real workshop data into a review queue before it touches inventory. Imports are workspace-scoped, row-level validated, and applied only after explicit confirmation."
         action={
-          <div className="rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <div className="w-full rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:w-auto">
             {jobs.length} recent import job{jobs.length === 1 ? "" : "s"}
           </div>
         }
@@ -280,24 +312,24 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   key={job.id}
                   href={`/imports?selected=${job.id}`}
                   className={cn(
-                    "block rounded-[24px] border p-4 transition",
+                    "block min-w-0 rounded-[24px] border p-4 transition",
                     isSelected
                       ? "border-slate-900 bg-slate-950 text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]"
                       : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className={cn("font-medium", isSelected ? "text-white" : "text-slate-950")}>
+                    <div className="min-w-0">
+                      <p className={cn("break-words font-medium", isSelected ? "text-white" : "text-slate-950")}>
                         {job.sourceName}
                       </p>
-                      <p className={cn("mt-1 text-sm", isSelected ? "text-white/75" : "text-slate-500")}>
+                      <p className={cn("mt-1 break-words text-sm", isSelected ? "text-white/75" : "text-slate-500")}>
                         {titleCase(job.entityType)} · {job.originalFilename}
                       </p>
                     </div>
                     <StatusBadge value={job.status} />
                   </div>
-                  <div className={cn("mt-3 grid grid-cols-4 gap-2 text-xs", isSelected ? "text-white/80" : "text-slate-500")}>
+                  <div className={cn("mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4", isSelected ? "text-white/80" : "text-slate-500")}>
                     <div>
                       <p className="font-medium">{job.totalRows}</p>
                       <p>Total</p>
@@ -370,29 +402,29 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   ) : null}
                 </div>
                 {selectedJob.status === "STAGED" ? (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
                     <form action={updateImportJobRowsBulk}>
                       <input type="hidden" name="jobId" value={selectedJob.id} />
                       <input type="hidden" name="operation" value="set_matched_update" />
                       <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm">
-                        Update all matched
+                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
+                        Update all matched ({selectedJob.matchedRows})
                       </SubmitButton>
                     </form>
                     <form action={updateImportJobRowsBulk}>
                       <input type="hidden" name="jobId" value={selectedJob.id} />
                       <input type="hidden" name="operation" value="set_unmatched_create" />
                       <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm">
-                        Create all unmatched
+                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
+                        Create all unmatched ({selectedJob.newRows})
                       </SubmitButton>
                     </form>
                     <form action={updateImportJobRowsBulk}>
                       <input type="hidden" name="jobId" value={selectedJob.id} />
                       <input type="hidden" name="operation" value="skip_ready" />
                       <input type="hidden" name="returnTo" value={selectedJobHref} />
-                      <SubmitButton variant="secondary" size="sm">
-                        Skip all ready
+                      <SubmitButton variant="secondary" size="sm" className="w-full sm:w-auto">
+                        Skip all ready ({actionableRows.length})
                       </SubmitButton>
                     </form>
                     <ConfirmActionForm
@@ -417,9 +449,117 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                 )}
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="flex flex-wrap gap-2">
+                {rowStatusFilters.map((filter) => {
+                  const href = selectedJob
+                    ? `/imports?selected=${selectedJob.id}&rowStatus=${filter.value}#staged-job`
+                    : `/imports?rowStatus=${filter.value}#staged-job`;
+                  const isActive = selectedRowFilter === filter.value;
+
+                  return (
+                    <Button
+                      key={filter.value}
+                      asChild
+                      size="sm"
+                      variant={isActive ? "default" : "secondary"}
+                      className={cn("w-full sm:w-auto", isActive ? "!text-white [&_svg]:!text-white" : "")}
+                    >
+                      <Link href={href as Parameters<typeof Link>[0]["href"]}>{filter.label}</Link>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
+                Showing {filteredRows.length} of {selectedJob.rows.length} row(s) in this staged job.
+              </div>
+
+              <div className="space-y-3 md:hidden">
+                {filteredRows.map((row) => (
+                  <div key={row.id} className={cn("rounded-[22px] border p-4", rowTone(row.status))}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
+                        </p>
+                      </div>
+                      <StatusBadge value={row.status} />
+                    </div>
+                    <div className="mt-4 space-y-3 text-sm text-slate-600">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Apply as</p>
+                        <div className="mt-2">
+                          {selectedJob.status === "STAGED" && row.status !== ImportRowStatus.APPLIED ? (
+                            <form action={updateImportRowResolution} className="space-y-2">
+                              <input type="hidden" name="rowId" value={row.id} />
+                              <input type="hidden" name="returnTo" value={selectedJobHref} />
+                              <Select name="resolution" defaultValue={row.resolution}>
+                                <option value="CREATE_NEW">Create new</option>
+                                <option value="UPDATE_MATCH" disabled={!row.suggestedMatchId}>
+                                  Update suggested match
+                                </option>
+                                <option value="SKIP">Skip</option>
+                              </Select>
+                              <SubmitButton variant="secondary" size="sm" className="w-full">
+                                Save
+                              </SubmitButton>
+                            </form>
+                          ) : (
+                            <p className="mt-2">{resolutionLabel(row.resolution)}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Validation</p>
+                        <div className="mt-2 space-y-1">
+                          {row.validationErrors.length > 0 ? (
+                            row.validationErrors.map((error) => <p key={error}>{error}</p>)
+                          ) : (
+                            <p>No validation issues</p>
+                          )}
+                        </div>
+                      </div>
+                      <details className="rounded-[18px] border border-slate-200 bg-white">
+                        <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                          View payload
+                        </summary>
+                        <div className="border-t border-slate-200 p-3">
+                          <pre className="overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                            {JSON.stringify(row.data, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
+                      <div className="flex flex-col gap-2">
+                        {canSkipRow(row.status) ? (
+                          <form action={updateImportRowDecision}>
+                            <input type="hidden" name="rowId" value={row.id} />
+                            <input type="hidden" name="decision" value="skip" />
+                            <input type="hidden" name="returnTo" value={selectedJobHref} />
+                            <SubmitButton variant="secondary" size="sm" className="w-full">
+                              Skip row
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                        {canRetryRow(row.status) ? (
+                          <form action={updateImportRowDecision}>
+                            <input type="hidden" name="rowId" value={row.id} />
+                            <input type="hidden" name="decision" value="retry" />
+                            <input type="hidden" name="returnTo" value={selectedJobHref} />
+                            <SubmitButton variant="secondary" size="sm" className="w-full">
+                              Re-queue row
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-[1120px] divide-y divide-slate-100 text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-500">
+                  <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500">
                     <tr>
                       <th className="px-4 py-3 font-medium whitespace-nowrap">Row</th>
                       <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
@@ -431,7 +571,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {selectedJob.rows.map((row) => (
+                    {filteredRows.map((row) => (
                       <tr key={row.id} className={cn("align-top", rowTone(row.status))}>
                         <td className="px-4 py-4 font-medium text-slate-950 whitespace-nowrap">{row.rowIndex}</td>
                         <td className="px-4 py-4 whitespace-nowrap">
@@ -472,9 +612,16 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           )}
                         </td>
                         <td className="min-w-[360px] px-4 py-4">
-                          <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                            {JSON.stringify(row.data, null, 2)}
-                          </pre>
+                          <details className="rounded-[18px] border border-slate-200 bg-white">
+                            <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                              View payload
+                            </summary>
+                            <div className="border-t border-slate-200 p-3">
+                              <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                                {JSON.stringify(row.data, null, 2)}
+                              </pre>
+                            </div>
+                          </details>
                         </td>
                         <td className="min-w-[160px] px-4 py-4">
                           <div className="flex flex-col gap-2">
