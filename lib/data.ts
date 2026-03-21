@@ -33,6 +33,7 @@ export async function getDashboardData() {
     tools,
     filamentByMaterial,
     wishlistByPriority,
+    stagedImportJobs,
   ] = await Promise.all([
     prisma.printer.count({ where: { workspaceId } }),
     prisma.printer.count({ where: { workspaceId, status: "ACTIVE" } }),
@@ -111,7 +112,31 @@ export async function getDashboardData() {
       by: ["priority"],
       _count: { _all: true },
     }),
+    prisma.importJob.findMany({
+      where: { workspaceId, status: "STAGED" },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    }),
   ]);
+
+  const printerSetupGaps = printers.filter(
+    (printer) =>
+      !printer.installedHotendId ||
+      !printer.installedPlateId ||
+      printer.materialSystems.length === 0,
+  );
+  const maintenanceAttention = printers.filter((printer) => {
+    const newestMaintenance = recentMaintenance.find((log) => log.printerId === printer.id);
+    if (!newestMaintenance) {
+      return true;
+    }
+    return newestMaintenance.date < subDays(new Date(), 45);
+  });
+  const topWishlistPriority =
+    wishlistByPriority.sort(
+      (a, b) =>
+        wishlistPriorityOrder.indexOf(a.priority) - wishlistPriorityOrder.indexOf(b.priority),
+    )[0] ?? null;
 
   return {
     lowStockConsumables: consumables
@@ -140,6 +165,24 @@ export async function getDashboardData() {
     smartPlugs,
     safetyEquipment,
     printers,
+    stagedImportJobs,
+    setupSummary: {
+      printerSetupGaps: printerSetupGaps.length,
+      maintenanceAttention: maintenanceAttention.length,
+    },
+    onboardingState: {
+      hasInventory:
+        totalPrinters > 0 ||
+        (totalFilamentSpools._sum.quantity ?? 0) > 0 ||
+        materialSystems.length > 0 ||
+        consumables.length > 0,
+    },
+    nextPriority: topWishlistPriority
+      ? {
+          priority: topWishlistPriority.priority,
+          count: topWishlistPriority._count._all,
+        }
+      : null,
     inventoryByCategory: [
       { label: "Printers", value: totalPrinters },
       { label: "Material Systems", value: materialSystems.length },
