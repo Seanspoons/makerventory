@@ -1403,3 +1403,84 @@ export async function applyStagedImport(formData: FormData) {
   });
   revalidateInventory();
 }
+
+export async function updateImportRowDecision(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const rowId = requiredString(formData, "rowId");
+  const decision = requiredString(formData, "decision");
+
+  if (!["skip", "retry"].includes(decision)) {
+    throw new Error("Unsupported import row decision.");
+  }
+
+  const row = await prisma.importRow.findFirst({
+    where: { id: rowId, workspaceId },
+    include: {
+      importJob: true,
+    },
+  });
+
+  if (!row) {
+    throw new Error("Import row not found.");
+  }
+
+  if (row.importJob.status !== "STAGED") {
+    throw new Error("Only staged imports can be edited.");
+  }
+
+  const nextStatus =
+    decision === "skip"
+      ? "SKIPPED"
+      : row.validationErrors.length > 0
+        ? "ERROR"
+        : row.suggestedMatchId
+          ? "MATCHED"
+          : "NEW";
+
+  await prisma.importRow.update({
+    where: { id: rowId },
+    data: {
+      status: nextStatus,
+    },
+  });
+
+  const rows = await prisma.importRow.findMany({
+    where: { importJobId: row.importJobId },
+    select: { status: true },
+  });
+
+  await prisma.importJob.update({
+    where: { id: row.importJobId },
+    data: {
+      newRows: rows.filter((item) => item.status === "NEW").length,
+      matchedRows: rows.filter((item) => item.status === "MATCHED").length,
+      conflictRows: rows.filter((item) => item.status === "CONFLICT").length,
+      skippedRows: rows.filter((item) => item.status === "SKIPPED" || item.status === "ERROR").length,
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "import-row",
+    entityId: rowId,
+    entityLabel: row.importJob.sourceName,
+    summary: decision === "skip" ? "Skipped staged import row." : "Re-queued staged import row.",
+    metadata: {
+      importJobId: row.importJobId,
+      rowIndex: row.rowIndex,
+      nextStatus,
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: decision === "skip" ? "Row skipped" : "Row restored",
+    message:
+      decision === "skip"
+        ? "The staged row will not be applied."
+        : "The staged row is back in the apply queue if it is valid.",
+  });
+  revalidatePath("/imports");
+}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ImportRowStatus } from "@prisma/client";
 import { format } from "date-fns";
-import { applyStagedImport, stageImportJob } from "@/app/actions";
+import { applyStagedImport, stageImportJob, updateImportRowDecision } from "@/app/actions";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ConfirmActionForm } from "@/components/inventory/confirm-action-form";
 import { PageHeader } from "@/components/page-header";
@@ -31,6 +31,14 @@ function rowTone(status: ImportRowStatus) {
   }
 
   return "bg-white";
+}
+
+function canRetryRow(status: ImportRowStatus) {
+  return status === ImportRowStatus.SKIPPED;
+}
+
+function canSkipRow(status: ImportRowStatus) {
+  return status === ImportRowStatus.NEW || status === ImportRowStatus.MATCHED;
 }
 
 export default async function ImportsPage(props: { searchParams?: SearchParams }) {
@@ -140,6 +148,12 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               <p className="font-medium text-slate-950">Production path</p>
               <p className="mt-2">
                 This is the first step away from demo-only seed data. The target is repeatable import and reconciliation for your actual workshop system of record.
+              </p>
+            </div>
+            <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+              <p className="font-medium text-slate-950">Per-row control</p>
+              <p className="mt-2">
+                Skip rows you do not want applied yet, then re-queue them later without re-uploading the whole file.
               </p>
             </div>
           </div>
@@ -278,6 +292,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       <th className="px-4 py-3 font-medium">Suggested match</th>
                       <th className="px-4 py-3 font-medium">Validation</th>
                       <th className="px-4 py-3 font-medium">Payload</th>
+                      <th className="px-4 py-3 font-medium">Decision</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -305,6 +320,38 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
                             {JSON.stringify(row.data, null, 2)}
                           </pre>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col gap-2">
+                            {canSkipRow(row.status) ? (
+                              <form action={updateImportRowDecision}>
+                                <input type="hidden" name="rowId" value={row.id} />
+                                <input type="hidden" name="decision" value="skip" />
+                                <SubmitButton variant="secondary" size="sm">
+                                  Skip row
+                                </SubmitButton>
+                              </form>
+                            ) : null}
+                            {canRetryRow(row.status) ? (
+                              <form action={updateImportRowDecision}>
+                                <input type="hidden" name="rowId" value={row.id} />
+                                <input type="hidden" name="decision" value="retry" />
+                                <SubmitButton variant="secondary" size="sm">
+                                  Re-queue row
+                                </SubmitButton>
+                              </form>
+                            ) : null}
+                            {row.status === ImportRowStatus.CONFLICT ? (
+                              <p className="text-xs leading-5 text-slate-500">
+                                Fix the source CSV and stage a new import to resolve conflicts.
+                              </p>
+                            ) : null}
+                            {row.status === ImportRowStatus.ERROR ? (
+                              <p className="text-xs leading-5 text-slate-500">
+                                This row is blocked by validation errors and cannot be re-queued until corrected upstream.
+                              </p>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
