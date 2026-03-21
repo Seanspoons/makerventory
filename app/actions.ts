@@ -2,13 +2,13 @@
 
 import {
   FilamentHygroscopicLevel,
-  ImportEntityType,
   MaterialSystemType,
   MaintenanceActionType,
   Prisma,
   StockStatus,
   WishlistPriority,
 } from "@prisma/client";
+import type { ImportEntityType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";

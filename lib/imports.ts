@@ -1,6 +1,5 @@
 import {
   FilamentHygroscopicLevel,
-  ImportEntityType,
   ImportJobStatus,
   ImportRowStatus,
   MaterialSystemStatus,
@@ -15,6 +14,7 @@ import {
   WishlistPriority,
   WishlistStatus,
 } from "@prisma/client";
+import type { ImportEntityType } from "@prisma/client";
 import { parse } from "csv-parse/sync";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
@@ -43,6 +43,18 @@ const IMPORT_ROW_RESOLUTIONS = {
   UPDATE_MATCH: "UPDATE_MATCH",
   SKIP: "SKIP",
 } as const;
+const IMPORT_ENTITY_TYPES = {
+  PRINTER: "PRINTER",
+  MATERIAL_SYSTEM: "MATERIAL_SYSTEM",
+  BUILD_PLATE: "BUILD_PLATE",
+  HOTEND: "HOTEND",
+  FILAMENT: "FILAMENT",
+  CONSUMABLE: "CONSUMABLE",
+  SAFETY: "SAFETY",
+  SMART_PLUG: "SMART_PLUG",
+  TOOL_PART: "TOOL_PART",
+  WISHLIST: "WISHLIST",
+} as const satisfies Record<ImportEntityType, ImportEntityType>;
 type ImportRowResolutionValue =
   (typeof IMPORT_ROW_RESOLUTIONS)[keyof typeof IMPORT_ROW_RESOLUTIONS];
 
@@ -725,18 +737,18 @@ export function parseInventoryNotes(text: string): NotesImportGroup[] {
 
     if (!section) continue;
 
-    if (section === "Printers") push(ImportEntityType.PRINTER, section, inferPrinterRecord(cleanNotesLine(line)));
-    else if (section === "Automatic Material System (AMS) / Dryers") push(ImportEntityType.MATERIAL_SYSTEM, section, inferMaterialSystemRecord(cleanNotesLine(line)));
-    else if (section === "Build Plates") push(ImportEntityType.BUILD_PLATE, section, inferBuildPlateRecord(cleanNotesLine(line)));
-    else if (section === "Hotends") push(ImportEntityType.HOTEND, section, inferHotendRecord(cleanNotesLine(line)));
-    else if (section === "Filament") push(ImportEntityType.FILAMENT, section, inferFilamentRecord(cleanNotesLine(line)));
-    else if (section === "Consumables & Maintenance") push(ImportEntityType.CONSUMABLE, section, inferConsumableRecord(line, section));
-    else if (section === "Safety & Air Quality") push(ImportEntityType.SAFETY, section, inferSafetyRecord(cleanNotesLine(line)));
-    else if (section === "Smart Plugs") push(ImportEntityType.SMART_PLUG, section, inferSmartPlugRecord(cleanNotesLine(line)));
+    if (section === "Printers") push(IMPORT_ENTITY_TYPES.PRINTER, section, inferPrinterRecord(cleanNotesLine(line)));
+    else if (section === "Automatic Material System (AMS) / Dryers") push(IMPORT_ENTITY_TYPES.MATERIAL_SYSTEM, section, inferMaterialSystemRecord(cleanNotesLine(line)));
+    else if (section === "Build Plates") push(IMPORT_ENTITY_TYPES.BUILD_PLATE, section, inferBuildPlateRecord(cleanNotesLine(line)));
+    else if (section === "Hotends") push(IMPORT_ENTITY_TYPES.HOTEND, section, inferHotendRecord(cleanNotesLine(line)));
+    else if (section === "Filament") push(IMPORT_ENTITY_TYPES.FILAMENT, section, inferFilamentRecord(cleanNotesLine(line)));
+    else if (section === "Consumables & Maintenance") push(IMPORT_ENTITY_TYPES.CONSUMABLE, section, inferConsumableRecord(line, section));
+    else if (section === "Safety & Air Quality") push(IMPORT_ENTITY_TYPES.SAFETY, section, inferSafetyRecord(cleanNotesLine(line)));
+    else if (section === "Smart Plugs") push(IMPORT_ENTITY_TYPES.SMART_PLUG, section, inferSmartPlugRecord(cleanNotesLine(line)));
     else if (section === "Extra Structural Printer Components" || section === "Related Tools and Parts") {
-      push(ImportEntityType.TOOL_PART, section, inferToolRecord(line, section));
+      push(IMPORT_ENTITY_TYPES.TOOL_PART, section, inferToolRecord(line, section));
     } else if (section === "Wishlist" && wishlistCategory && line.startsWith("-")) {
-      push(ImportEntityType.WISHLIST, `Wishlist · ${wishlistCategory}`, inferWishlistRecord(line, wishlistCategory));
+      push(IMPORT_ENTITY_TYPES.WISHLIST, `Wishlist · ${wishlistCategory}`, inferWishlistRecord(line, wishlistCategory));
     }
   }
 
@@ -1346,25 +1358,25 @@ export async function stageImportRecords(
       : records;
 
   switch (entityType) {
-    case ImportEntityType.PRINTER:
+    case IMPORT_ENTITY_TYPES.PRINTER:
       return stagePrinterRows(workspaceId, mappedRecords);
-    case ImportEntityType.MATERIAL_SYSTEM:
+    case IMPORT_ENTITY_TYPES.MATERIAL_SYSTEM:
       return stageMaterialSystemRows(workspaceId, mappedRecords);
-    case ImportEntityType.BUILD_PLATE:
+    case IMPORT_ENTITY_TYPES.BUILD_PLATE:
       return stageBuildPlateRows(workspaceId, mappedRecords);
-    case ImportEntityType.HOTEND:
+    case IMPORT_ENTITY_TYPES.HOTEND:
       return stageHotendRows(workspaceId, mappedRecords);
-    case ImportEntityType.FILAMENT:
+    case IMPORT_ENTITY_TYPES.FILAMENT:
       return stageFilamentRows(workspaceId, mappedRecords);
-    case ImportEntityType.CONSUMABLE:
+    case IMPORT_ENTITY_TYPES.CONSUMABLE:
       return stageConsumableRows(workspaceId, mappedRecords);
-    case ImportEntityType.SAFETY:
+    case IMPORT_ENTITY_TYPES.SAFETY:
       return stageSafetyRows(workspaceId, mappedRecords);
-    case ImportEntityType.SMART_PLUG:
+    case IMPORT_ENTITY_TYPES.SMART_PLUG:
       return stageSmartPlugRows(workspaceId, mappedRecords);
-    case ImportEntityType.TOOL_PART:
+    case IMPORT_ENTITY_TYPES.TOOL_PART:
       return stageToolRows(workspaceId, mappedRecords);
-    case ImportEntityType.WISHLIST:
+    case IMPORT_ENTITY_TYPES.WISHLIST:
       return stageWishlistRows(workspaceId, mappedRecords);
     default:
       return [];
@@ -1449,7 +1461,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
 
       const payload = row.data as Record<string, unknown>;
 
-      if (job.entityType === ImportEntityType.PRINTER) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.PRINTER) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1475,7 +1487,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.MATERIAL_SYSTEM) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.MATERIAL_SYSTEM) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1497,7 +1509,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.BUILD_PLATE) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.BUILD_PLATE) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1520,7 +1532,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.HOTEND) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.HOTEND) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1545,7 +1557,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.FILAMENT) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.FILAMENT) {
         const common = {
           brand: String(payload.brand ?? ""),
           materialType: String(payload.materialType ?? ""),
@@ -1614,7 +1626,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.CONSUMABLE) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.CONSUMABLE) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1638,7 +1650,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.SAFETY) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.SAFETY) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1659,7 +1671,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.SMART_PLUG) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.SMART_PLUG) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1680,7 +1692,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.TOOL_PART) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.TOOL_PART) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
@@ -1701,7 +1713,7 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         }
       }
 
-      if (job.entityType === ImportEntityType.WISHLIST) {
+      if (job.entityType === IMPORT_ENTITY_TYPES.WISHLIST) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
