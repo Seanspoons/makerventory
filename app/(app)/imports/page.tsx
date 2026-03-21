@@ -67,6 +67,71 @@ function resolutionLabel(resolution: ImportRowResolution) {
   return "Create new";
 }
 
+function rowGuidance(row: {
+  status: ImportRowStatus;
+  resolution: ImportRowResolution;
+  validationErrors: string[];
+  suggestedMatchSlug: string | null;
+}) {
+  if (row.status === ImportRowStatus.CONFLICT) {
+    return {
+      tone: "rose" as const,
+      label: "Blocked",
+      detail: "Conflict detected. Clean the source or split the import before restaging.",
+    };
+  }
+
+  if (row.status === ImportRowStatus.ERROR) {
+    return {
+      tone: "rose" as const,
+      label: "Validation issue",
+      detail: row.validationErrors[0] ?? "This row has validation issues and cannot apply yet.",
+    };
+  }
+
+  if (row.status === ImportRowStatus.MATCHED) {
+    return {
+      tone: "amber" as const,
+      label: "Review match",
+      detail:
+        row.resolution === "UPDATE_MATCH"
+          ? "This row will update the suggested match when applied."
+          : row.suggestedMatchSlug
+            ? "Check the suggested match before applying this row."
+            : "Matched rows should be verified before apply.",
+    };
+  }
+
+  if (row.status === ImportRowStatus.SKIPPED || row.resolution === "SKIP") {
+    return {
+      tone: "slate" as const,
+      label: "Skipped",
+      detail: "This row is out of the apply set until you re-queue it.",
+    };
+  }
+
+  if (row.status === ImportRowStatus.APPLIED) {
+    return {
+      tone: "emerald" as const,
+      label: "Applied",
+      detail: "This row has already been written into workspace inventory.",
+    };
+  }
+
+  return {
+    tone: "emerald" as const,
+    label: "Ready",
+    detail: "This row is ready to create a new record when you apply the job.",
+  };
+}
+
+function guidanceToneClasses(tone: "rose" | "amber" | "emerald" | "slate") {
+  if (tone === "rose") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
 export default async function ImportsPage(props: { searchParams?: SearchParams }) {
   const searchParams = (await props.searchParams) ?? {};
   const selected =
@@ -592,8 +657,14 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               </div>
 
               <div className="space-y-3 md:hidden">
-                {filteredRows.map((row) => (
+                {filteredRows.map((row) => {
+                  const guidance = rowGuidance(row);
+                  return (
                   <div key={row.id} className={cn("rounded-[22px] border p-4", rowTone(row.status))}>
+                    <div className={cn("mb-3 rounded-2xl border px-3 py-2 text-sm", guidanceToneClasses(guidance.tone))}>
+                      <p className="font-medium">{guidance.label}</p>
+                      <p className="mt-1 leading-6">{guidance.detail}</p>
+                    </div>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
@@ -671,7 +742,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
 
               <div className="hidden overflow-x-auto md:block">
@@ -688,7 +759,9 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredRows.map((row) => (
+                    {filteredRows.map((row) => {
+                      const guidance = rowGuidance(row);
+                      return (
                       <tr key={row.id} className={cn("align-top", rowTone(row.status))}>
                         <td className="px-4 py-4 font-medium text-slate-950 whitespace-nowrap">{row.rowIndex}</td>
                         <td className="px-4 py-4 whitespace-nowrap">
@@ -718,6 +791,10 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
                         </td>
                         <td className="min-w-[220px] px-4 py-4 text-slate-600">
+                          <div className={cn("mb-2 rounded-2xl border px-3 py-2 text-xs leading-5", guidanceToneClasses(guidance.tone))}>
+                            <p className="font-medium">{guidance.label}</p>
+                            <p className="mt-1">{guidance.detail}</p>
+                          </div>
                           {row.validationErrors.length > 0 ? (
                             <div className="space-y-1">
                               {row.validationErrors.map((error) => (
@@ -775,7 +852,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

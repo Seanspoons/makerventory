@@ -42,13 +42,27 @@ export default async function ConsumablesPage(props: { searchParams?: SearchPara
       <QuickAddShell title="Add consumable" description="Add a maintenance or cleaning item to operational stock.">
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="consumable" />
-          <Input name="name" placeholder="Name" required />
-          <Input name="category" placeholder="Category" required />
-          <Input name="quantity" type="number" step="0.01" placeholder="Quantity" required />
-          <Input name="unit" placeholder="Unit" required />
-          <Input name="reorderThreshold" type="number" step="0.01" placeholder="Reorder threshold" required />
-          <Input name="storageLocation" placeholder="Storage location" />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Name">
+            <Input name="name" placeholder="Glue stick" required />
+          </LabeledField>
+          <LabeledField label="Category">
+            <Input name="category" placeholder="Cleaning" required />
+          </LabeledField>
+          <LabeledField label="Quantity">
+            <Input name="quantity" type="number" step="0.01" placeholder="3" required />
+          </LabeledField>
+          <LabeledField label="Unit">
+            <Input name="unit" placeholder="pcs" required />
+          </LabeledField>
+          <LabeledField label="Reorder threshold">
+            <Input name="reorderThreshold" type="number" step="0.01" placeholder="2" required />
+          </LabeledField>
+          <LabeledField label="Storage location">
+            <Input name="storageLocation" placeholder="Maintenance bin" />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Optional stock note" />
+          </LabeledField>
           <div className="lg:col-span-2"><SubmitButton>Add consumable</SubmitButton></div>
         </form>
       </QuickAddShell>

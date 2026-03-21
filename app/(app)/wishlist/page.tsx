@@ -46,18 +46,32 @@ export default async function WishlistPage(props: { searchParams?: SearchParams 
       >
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-3">
           <input type="hidden" name="kind" value="wishlist" />
-          <Input name="name" placeholder="Item name" required />
-          <Input name="category" placeholder="Category" required />
-          <Select name="priority" defaultValue="MEDIUM">
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </Select>
-          <Input name="estimatedCost" type="number" step="0.01" placeholder="Estimated cost" />
-          <Input name="vendor" placeholder="Vendor" />
-          <Input name="purchaseUrl" placeholder="Purchase URL" />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-3" />
+          <LabeledField label="Item name">
+            <Input name="name" placeholder="PA6-GF" required />
+          </LabeledField>
+          <LabeledField label="Category">
+            <Input name="category" placeholder="Filament" required />
+          </LabeledField>
+          <LabeledField label="Priority">
+            <Select name="priority" defaultValue="MEDIUM">
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </Select>
+          </LabeledField>
+          <LabeledField label="Estimated cost">
+            <Input name="estimatedCost" type="number" step="0.01" placeholder="49.99" />
+          </LabeledField>
+          <LabeledField label="Vendor">
+            <Input name="vendor" placeholder="Bambu Lab" />
+          </LabeledField>
+          <LabeledField label="Purchase URL">
+            <Input name="purchaseUrl" placeholder="https://..." />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-3">
+            <Textarea name="notes" placeholder="Why this matters next" />
+          </LabeledField>
           <div className="lg:col-span-3">
             <SubmitButton>Add wishlist item</SubmitButton>
           </div>

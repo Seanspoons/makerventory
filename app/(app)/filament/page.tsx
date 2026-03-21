@@ -1,4 +1,5 @@
 import { createInventoryItem, updateFilamentState, updateInventoryItem } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { EditDialog } from "@/components/inventory/edit-dialog";
@@ -84,28 +85,50 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
       >
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-3">
           <input type="hidden" name="kind" value="filament" />
-          <Input name="brand" placeholder="Brand" required />
-          <Input name="materialType" placeholder="Material type" required />
-          <Input name="color" placeholder="Color" required />
-          <Input name="quantity" type="number" min="1" defaultValue="1" placeholder="Quantity" />
-          <Input name="estimatedRemainingGrams" type="number" defaultValue="1000" placeholder="Remaining grams" />
-          <Input name="storageLocation" placeholder="Storage location" />
-          <Select name="hygroscopicLevel" defaultValue="">
-            <option value="">Hygroscopic level</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-          </Select>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" name="abrasive" className="rounded" />
-            Abrasive
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" name="dryingRequired" className="rounded" />
-            Drying required
-          </label>
-          <Textarea name="notes" placeholder="Usage notes" className="lg:col-span-3" />
-          <Textarea name="recommendationNotes" placeholder="Compatibility / recommendation notes" className="lg:col-span-3" />
+          <LabeledField label="Brand">
+            <Input name="brand" placeholder="Bambu Lab" required />
+          </LabeledField>
+          <LabeledField label="Material type">
+            <Input name="materialType" placeholder="PLA" required />
+          </LabeledField>
+          <LabeledField label="Color">
+            <Input name="color" placeholder="White" required />
+          </LabeledField>
+          <LabeledField label="Quantity">
+            <Input name="quantity" type="number" min="1" defaultValue="1" placeholder="1" />
+          </LabeledField>
+          <LabeledField label="Estimated remaining grams">
+            <Input name="estimatedRemainingGrams" type="number" defaultValue="1000" placeholder="1000" />
+          </LabeledField>
+          <LabeledField label="Storage location">
+            <Input name="storageLocation" placeholder="Dry box shelf" />
+          </LabeledField>
+          <LabeledField label="Hygroscopic level">
+            <Select name="hygroscopicLevel" defaultValue="">
+              <option value="">Select level</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+            </Select>
+          </LabeledField>
+          <LabeledField label="Material handling">
+            <label className="flex min-h-[42px] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700">
+              <input type="checkbox" name="abrasive" className="rounded" />
+              Abrasive
+            </label>
+          </LabeledField>
+          <LabeledField label="Drying">
+            <label className="flex min-h-[42px] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700">
+              <input type="checkbox" name="dryingRequired" className="rounded" />
+              Drying required
+            </label>
+          </LabeledField>
+          <LabeledField label="Usage notes" className="lg:col-span-3">
+            <Textarea name="notes" placeholder="Recommended use or handling notes" />
+          </LabeledField>
+          <LabeledField label="Compatibility / recommendation notes" className="lg:col-span-3">
+            <Textarea name="recommendationNotes" placeholder="Nozzle or drying guidance" />
+          </LabeledField>
           <div className="lg:col-span-3">
             <SubmitButton>Add filament</SubmitButton>
           </div>

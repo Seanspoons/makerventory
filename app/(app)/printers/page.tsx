@@ -60,14 +60,30 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
       >
         <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="kind" value="printer" />
-          <Input name="name" placeholder="Printer name" required />
-          <Input name="brand" placeholder="Brand" required />
-          <Input name="model" placeholder="Model" required />
-          <Input name="location" placeholder="Location" />
-          <Input name="buildVolumeX" placeholder="Build volume X" type="number" required />
-          <Input name="buildVolumeY" placeholder="Build volume Y" type="number" required />
-          <Input name="buildVolumeZ" placeholder="Build volume Z" type="number" required />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-2" />
+          <LabeledField label="Printer name">
+            <Input name="name" placeholder="Bambu Lab A1 Mini" required />
+          </LabeledField>
+          <LabeledField label="Brand">
+            <Input name="brand" placeholder="Bambu Lab" required />
+          </LabeledField>
+          <LabeledField label="Model">
+            <Input name="model" placeholder="A1 Mini" required />
+          </LabeledField>
+          <LabeledField label="Location">
+            <Input name="location" placeholder="Bench location" />
+          </LabeledField>
+          <LabeledField label="Build volume X">
+            <Input name="buildVolumeX" placeholder="180" type="number" required />
+          </LabeledField>
+          <LabeledField label="Build volume Y">
+            <Input name="buildVolumeY" placeholder="180" type="number" required />
+          </LabeledField>
+          <LabeledField label="Build volume Z">
+            <Input name="buildVolumeZ" placeholder="180" type="number" required />
+          </LabeledField>
+          <LabeledField label="Notes" className="lg:col-span-2">
+            <Textarea name="notes" placeholder="Optional workshop notes" />
+          </LabeledField>
           <div className="lg:col-span-2">
             <SubmitButton>Add printer</SubmitButton>
           </div>

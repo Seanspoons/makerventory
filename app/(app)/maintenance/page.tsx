@@ -1,4 +1,5 @@
 import { createMaintenanceLog } from "@/app/actions";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { ArchiveForm } from "@/components/inventory/archive-form";
 import { FilterBar } from "@/components/inventory/filter-bar";
@@ -53,35 +54,47 @@ export default async function MaintenancePage(props: { searchParams?: SearchPara
         description="Capture the action, date, and linked asset so the service history remains useful later."
       >
         <form action={createMaintenanceLog} className="grid gap-4 lg:grid-cols-3">
-          <Input type="date" name="date" required />
-          <Select name="actionType" defaultValue="INSPECTION">
-            <option value="NOZZLE_SWAP">Nozzle swap</option>
-            <option value="LUBRICATION">Lubrication</option>
-            <option value="BED_CLEANING">Bed cleaning</option>
-            <option value="WIPER_REPLACEMENT">Wiper replacement</option>
-            <option value="PTFE_REPLACEMENT">PTFE replacement</option>
-            <option value="DESICCANT_REFRESH">Desiccant refresh</option>
-            <option value="EXHAUST_UPDATE">Exhaust update</option>
-            <option value="INSPECTION">Inspection</option>
-            <option value="OTHER">Other</option>
-          </Select>
-          <Input name="actionPerformed" placeholder="Action performed" required />
-          <Select name="assetType" defaultValue="printer">
-            <option value="printer">Printer</option>
-            <option value="materialSystem">Material system</option>
-            <option value="buildPlate">Build plate</option>
-            <option value="hotend">Hotend</option>
-            <option value="safety">Safety equipment</option>
-          </Select>
-          <Select name="assetId" defaultValue={printers[0]?.id}>
-            {[...printers.map((item) => ({ value: item.id, label: item.name })), ...materialSystems.map((item) => ({ value: item.id, label: item.name })), ...buildPlates.map((item) => ({ value: item.id, label: item.name })), ...hotends.map((item) => ({ value: item.id, label: item.name })), ...safety.map((item) => ({ value: item.id, label: item.name }))].map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+          <LabeledField label="Date">
+            <Input type="date" name="date" required />
+          </LabeledField>
+          <LabeledField label="Action type">
+            <Select name="actionType" defaultValue="INSPECTION">
+              <option value="NOZZLE_SWAP">Nozzle swap</option>
+              <option value="LUBRICATION">Lubrication</option>
+              <option value="BED_CLEANING">Bed cleaning</option>
+              <option value="WIPER_REPLACEMENT">Wiper replacement</option>
+              <option value="PTFE_REPLACEMENT">PTFE replacement</option>
+              <option value="DESICCANT_REFRESH">Desiccant refresh</option>
+              <option value="EXHAUST_UPDATE">Exhaust update</option>
+              <option value="INSPECTION">Inspection</option>
+              <option value="OTHER">Other</option>
+            </Select>
+          </LabeledField>
+          <LabeledField label="Action performed">
+            <Input name="actionPerformed" placeholder="Lubricated X axis" required />
+          </LabeledField>
+          <LabeledField label="Asset type">
+            <Select name="assetType" defaultValue="printer">
+              <option value="printer">Printer</option>
+              <option value="materialSystem">Material system</option>
+              <option value="buildPlate">Build plate</option>
+              <option value="hotend">Hotend</option>
+              <option value="safety">Safety equipment</option>
+            </Select>
+          </LabeledField>
+          <LabeledField label="Asset">
+            <Select name="assetId" defaultValue={printers[0]?.id}>
+              {[...printers.map((item) => ({ value: item.id, label: item.name })), ...materialSystems.map((item) => ({ value: item.id, label: item.name })), ...buildPlates.map((item) => ({ value: item.id, label: item.name })), ...hotends.map((item) => ({ value: item.id, label: item.name })), ...safety.map((item) => ({ value: item.id, label: item.name }))].map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </LabeledField>
           <div />
-          <Textarea name="notes" placeholder="Notes" className="lg:col-span-3" />
+          <LabeledField label="Notes" className="lg:col-span-3">
+            <Textarea name="notes" placeholder="What was done and why" />
+          </LabeledField>
           <div className="lg:col-span-3">
             <SubmitButton>Log maintenance</SubmitButton>
           </div>

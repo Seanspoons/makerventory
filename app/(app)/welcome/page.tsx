@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, Boxes, PackagePlus, Upload, Wrench } from "lucide-react";
 import { createInventoryItem } from "@/app/actions";
 import { auth } from "@/lib/auth";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { SectionCard } from "@/components/section-card";
 import { Button } from "@/components/ui/button";
@@ -111,14 +112,30 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
           <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
             <input type="hidden" name="kind" value="printer" />
             <input type="hidden" name="returnTo" value="/welcome?step=filament" />
-            <Input name="name" placeholder="Bambu Lab A1 Mini" required />
-            <Input name="brand" placeholder="Bambu Lab" required />
-            <Input name="model" placeholder="A1 Mini" required />
-            <Input name="location" placeholder="Bench location" />
-            <Input name="buildVolumeX" type="number" placeholder="180" required />
-            <Input name="buildVolumeY" type="number" placeholder="180" required />
-            <Input name="buildVolumeZ" type="number" placeholder="180" required />
-            <Textarea name="notes" placeholder="Optional workshop notes" className="lg:col-span-2" />
+            <LabeledField label="Printer name">
+              <Input name="name" placeholder="Bambu Lab A1 Mini" required />
+            </LabeledField>
+            <LabeledField label="Brand">
+              <Input name="brand" placeholder="Bambu Lab" required />
+            </LabeledField>
+            <LabeledField label="Model">
+              <Input name="model" placeholder="A1 Mini" required />
+            </LabeledField>
+            <LabeledField label="Location">
+              <Input name="location" placeholder="Bench location" />
+            </LabeledField>
+            <LabeledField label="Build volume X">
+              <Input name="buildVolumeX" type="number" placeholder="180" required />
+            </LabeledField>
+            <LabeledField label="Build volume Y">
+              <Input name="buildVolumeY" type="number" placeholder="180" required />
+            </LabeledField>
+            <LabeledField label="Build volume Z">
+              <Input name="buildVolumeZ" type="number" placeholder="180" required />
+            </LabeledField>
+            <LabeledField label="Notes" className="lg:col-span-2">
+              <Textarea name="notes" placeholder="Optional workshop notes" />
+            </LabeledField>
             <div className="lg:col-span-2">
               <SubmitButton>Add first printer</SubmitButton>
             </div>
@@ -133,13 +150,27 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
           <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
             <input type="hidden" name="kind" value="filament" />
             <input type="hidden" name="returnTo" value="/dashboard" />
-            <Input name="brand" placeholder="Bambu Lab" required />
-            <Input name="materialType" placeholder="PLA" required />
-            <Input name="color" placeholder="White" required />
-            <Input name="quantity" type="number" min="1" defaultValue="1" />
-            <Input name="estimatedRemainingGrams" type="number" defaultValue="1000" />
-            <Input name="storageLocation" placeholder="Drawer or shelf" />
-            <Textarea name="notes" placeholder="Optional stock note" className="lg:col-span-2" />
+            <LabeledField label="Brand">
+              <Input name="brand" placeholder="Bambu Lab" required />
+            </LabeledField>
+            <LabeledField label="Material type">
+              <Input name="materialType" placeholder="PLA" required />
+            </LabeledField>
+            <LabeledField label="Color">
+              <Input name="color" placeholder="White" required />
+            </LabeledField>
+            <LabeledField label="Quantity">
+              <Input name="quantity" type="number" min="1" defaultValue="1" />
+            </LabeledField>
+            <LabeledField label="Estimated remaining grams">
+              <Input name="estimatedRemainingGrams" type="number" defaultValue="1000" />
+            </LabeledField>
+            <LabeledField label="Storage location">
+              <Input name="storageLocation" placeholder="Drawer or shelf" />
+            </LabeledField>
+            <LabeledField label="Notes" className="lg:col-span-2">
+              <Textarea name="notes" placeholder="Optional stock note" />
+            </LabeledField>
             <div className="lg:col-span-2">
               <SubmitButton>
                 <PackagePlus className="mr-2 h-4 w-4" />
