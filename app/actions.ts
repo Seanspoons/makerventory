@@ -1708,3 +1708,141 @@ export async function updateImportRowResolution(formData: FormData) {
     redirect(returnTo as Parameters<typeof redirect>[0]);
   }
 }
+
+export async function updateImportJobRowsBulk(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const jobId = requiredString(formData, "jobId");
+  const operation = requiredString(formData, "operation");
+  const returnTo = optionalString(formData, "returnTo");
+
+  if (!["set_matched_update", "set_unmatched_create", "skip_ready"].includes(operation)) {
+    throw new Error("Unsupported import job bulk operation.");
+  }
+
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, workspaceId },
+    include: { rows: true },
+  });
+
+  if (!job) {
+    throw new Error("Import job not found.");
+  }
+
+  if (job.status !== "STAGED") {
+    throw new Error("Only staged imports can be edited.");
+  }
+
+  const rowsToUpdate = job.rows.filter((row) => {
+    if (row.status === "APPLIED" || row.status === "CONFLICT" || row.status === "ERROR") {
+      return false;
+    }
+
+    if (operation === "set_matched_update") {
+      return Boolean(row.suggestedMatchId) && row.validationErrors.length === 0;
+    }
+
+    if (operation === "set_unmatched_create") {
+      return !row.suggestedMatchId && row.validationErrors.length === 0;
+    }
+
+    return row.status === "NEW" || row.status === "MATCHED";
+  });
+
+  if (rowsToUpdate.length === 0) {
+    await setFlashMessage({
+      type: "error",
+      title: "No rows changed",
+      message: "No staged rows matched that bulk action.",
+    });
+    revalidatePath("/imports");
+    if (returnTo) {
+      redirect(returnTo as Parameters<typeof redirect>[0]);
+    }
+    return;
+  }
+
+  await prisma.$transaction(
+    rowsToUpdate.map((row) => {
+      if (operation === "set_matched_update") {
+        return prisma.importRow.update({
+          where: { id: row.id },
+          data: {
+            resolution: "UPDATE_MATCH",
+            status: "MATCHED",
+            resolvedMatchId: row.suggestedMatchId,
+            resolvedMatchSlug: row.suggestedMatchSlug,
+          },
+        });
+      }
+
+      if (operation === "set_unmatched_create") {
+        return prisma.importRow.update({
+          where: { id: row.id },
+          data: {
+            resolution: "CREATE_NEW",
+            status: "NEW",
+            resolvedMatchId: null,
+            resolvedMatchSlug: null,
+          },
+        });
+      }
+
+      return prisma.importRow.update({
+        where: { id: row.id },
+        data: {
+          resolution: "SKIP",
+          status: "SKIPPED",
+          resolvedMatchId: null,
+          resolvedMatchSlug: null,
+        },
+      });
+    }),
+  );
+
+  const refreshedRows = await prisma.importRow.findMany({
+    where: { importJobId: jobId },
+    select: { status: true },
+  });
+
+  await prisma.importJob.update({
+    where: { id: jobId },
+    data: summarizeImportRows(refreshedRows),
+  });
+
+  const title =
+    operation === "set_matched_update"
+      ? "Matched rows set to update"
+      : operation === "set_unmatched_create"
+        ? "Unmatched rows set to create"
+        : "Ready rows skipped";
+  const message =
+    operation === "set_matched_update"
+      ? `${rowsToUpdate.length} row(s) will update their suggested match.`
+      : operation === "set_unmatched_create"
+        ? `${rowsToUpdate.length} row(s) will create new records.`
+        : `${rowsToUpdate.length} ready row(s) were removed from the apply set.`;
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "import-job",
+    entityId: jobId,
+    entityLabel: job.sourceName,
+    summary: title,
+    metadata: {
+      operation,
+      updatedRows: rowsToUpdate.length,
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title,
+    message,
+  });
+  revalidatePath("/imports");
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
+}

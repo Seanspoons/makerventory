@@ -6,6 +6,7 @@ import {
   applyStagedImport,
   stageImportJob,
   stageInventoryNotesImport,
+  updateImportJobRowsBulk,
   updateImportRowDecision,
   updateImportRowResolution,
 } from "@/app/actions";
@@ -369,20 +370,46 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   ) : null}
                 </div>
                 {selectedJob.status === "STAGED" ? (
-                  <ConfirmActionForm
-                    action={applyStagedImport}
-                    title="Apply staged import"
-                    description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
-                    confirmLabel="Apply import"
-                    triggerLabel="Apply all ready rows"
-                    triggerVariant="secondary"
-                  >
-                    <input type="hidden" name="jobId" value={selectedJob.id} />
-                    <input type="hidden" name="returnTo" value={selectedJobHref} />
-                    <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
-                      {actionableRows.length} row(s) are eligible to apply in this job.
-                    </div>
-                  </ConfirmActionForm>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form action={updateImportJobRowsBulk}>
+                      <input type="hidden" name="jobId" value={selectedJob.id} />
+                      <input type="hidden" name="operation" value="set_matched_update" />
+                      <input type="hidden" name="returnTo" value={selectedJobHref} />
+                      <SubmitButton variant="secondary" size="sm">
+                        Update all matched
+                      </SubmitButton>
+                    </form>
+                    <form action={updateImportJobRowsBulk}>
+                      <input type="hidden" name="jobId" value={selectedJob.id} />
+                      <input type="hidden" name="operation" value="set_unmatched_create" />
+                      <input type="hidden" name="returnTo" value={selectedJobHref} />
+                      <SubmitButton variant="secondary" size="sm">
+                        Create all unmatched
+                      </SubmitButton>
+                    </form>
+                    <form action={updateImportJobRowsBulk}>
+                      <input type="hidden" name="jobId" value={selectedJob.id} />
+                      <input type="hidden" name="operation" value="skip_ready" />
+                      <input type="hidden" name="returnTo" value={selectedJobHref} />
+                      <SubmitButton variant="secondary" size="sm">
+                        Skip all ready
+                      </SubmitButton>
+                    </form>
+                    <ConfirmActionForm
+                      action={applyStagedImport}
+                      title="Apply staged import"
+                      description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
+                      confirmLabel="Apply import"
+                      triggerLabel="Apply all ready rows"
+                      triggerVariant="secondary"
+                    >
+                      <input type="hidden" name="jobId" value={selectedJob.id} />
+                      <input type="hidden" name="returnTo" value={selectedJobHref} />
+                      <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                        {actionableRows.length} row(s) are eligible to apply in this job.
+                      </div>
+                    </ConfirmActionForm>
+                  </div>
                 ) : (
                   <Button type="button" variant="secondary" disabled>
                     Import applied
