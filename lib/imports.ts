@@ -4,7 +4,14 @@ import {
   ImportJobStatus,
   ImportRowResolution,
   ImportRowStatus,
+  MaterialSystemStatus,
+  MaterialSystemType,
+  BuildPlateStatus,
+  HotendStatus,
+  PrinterStatus,
   Prisma,
+  SafetyStatus,
+  SmartPlugStatus,
   StockStatus,
   WishlistPriority,
   WishlistStatus,
@@ -24,8 +31,40 @@ const WISHLIST_STATUSES = new Set<WishlistStatus>([
   "READY_TO_BUY",
   "PURCHASED",
 ]);
+const PRINTER_STATUSES = new Set<PrinterStatus>(["ACTIVE", "MAINTENANCE", "OFFLINE", "ARCHIVED"]);
+const MATERIAL_SYSTEM_TYPES = new Set<MaterialSystemType>(["AMS_LITE", "AMS_2_PRO", "AMS_HT", "DRYER"]);
+const MATERIAL_SYSTEM_STATUSES = new Set<MaterialSystemStatus>(["ACTIVE", "STANDBY", "MAINTENANCE", "OFFLINE", "ARCHIVED"]);
+const BUILD_PLATE_STATUSES = new Set<BuildPlateStatus>(["AVAILABLE", "IN_USE", "WORN", "RETIRED"]);
+const HOTEND_STATUSES = new Set<HotendStatus>(["AVAILABLE", "IN_USE", "LOW_STOCK", "RETIRED"]);
+const SAFETY_STATUSES = new Set<SafetyStatus>(["ACTIVE", "NEEDS_ATTENTION", "PLANNED", "ARCHIVED"]);
+const SMART_PLUG_STATUSES = new Set<SmartPlugStatus>(["ONLINE", "OFFLINE", "DISABLED"]);
+const KNOWN_BRANDS = ["Bambu Lab", "ELEGOO", "AnyCubic", "Overture", "Sunlu", "Polymaker", "Siraya Tech", "Creality"];
 
 export const importEntityOptions = [
+  {
+    value: "PRINTER" as const,
+    label: "Printers",
+    description:
+      "Columns: name, brand, model, buildVolumeX, buildVolumeY, buildVolumeZ, location, status, notes.",
+  },
+  {
+    value: "MATERIAL_SYSTEM" as const,
+    label: "Material Systems / Dryers",
+    description:
+      "Columns: name, type, status, supportedMaterialsNotes, notes.",
+  },
+  {
+    value: "BUILD_PLATE" as const,
+    label: "Build Plates",
+    description:
+      "Columns: name, sizeLabel, sizeMm, surfaceType, status, notes.",
+  },
+  {
+    value: "HOTEND" as const,
+    label: "Hotends",
+    description:
+      "Columns: name, nozzleSize, materialType, quantity, inUseCount, spareCount, status, notes.",
+  },
   {
     value: "FILAMENT" as const,
     label: "Filament",
@@ -37,6 +76,18 @@ export const importEntityOptions = [
     label: "Consumables",
     description:
       "Columns: name, category, quantity, unit, reorderThreshold, status, storageLocation.",
+  },
+  {
+    value: "SAFETY" as const,
+    label: "Safety",
+    description:
+      "Columns: name, type, status, replacementSchedule, notes.",
+  },
+  {
+    value: "SMART_PLUG" as const,
+    label: "Smart Plugs",
+    description:
+      "Columns: name, assignedDeviceLabel, status, powerMonitoringCapable, notes.",
   },
   {
     value: "TOOL_PART" as const,
@@ -72,6 +123,40 @@ type StagedRow = {
 };
 
 export const importFieldConfigs = {
+  PRINTER: [
+    { key: "name", label: "Name", required: true },
+    { key: "brand", label: "Brand", required: true },
+    { key: "model", label: "Model", required: true },
+    { key: "buildVolumeX", label: "Build volume X" },
+    { key: "buildVolumeY", label: "Build volume Y" },
+    { key: "buildVolumeZ", label: "Build volume Z" },
+    { key: "location", label: "Location" },
+    { key: "status", label: "Status" },
+  ],
+  MATERIAL_SYSTEM: [
+    { key: "name", label: "Name", required: true },
+    { key: "type", label: "Type", required: true },
+    { key: "status", label: "Status" },
+    { key: "supportedMaterialsNotes", label: "Supported materials notes" },
+    { key: "notes", label: "Notes" },
+  ],
+  BUILD_PLATE: [
+    { key: "name", label: "Name", required: true },
+    { key: "sizeLabel", label: "Size label", required: true },
+    { key: "sizeMm", label: "Size mm", required: true },
+    { key: "surfaceType", label: "Surface type", required: true },
+    { key: "status", label: "Status" },
+    { key: "notes", label: "Notes" },
+  ],
+  HOTEND: [
+    { key: "name", label: "Name", required: true },
+    { key: "nozzleSize", label: "Nozzle size", required: true },
+    { key: "materialType", label: "Material type", required: true },
+    { key: "quantity", label: "Quantity" },
+    { key: "inUseCount", label: "In use count" },
+    { key: "spareCount", label: "Spare count" },
+    { key: "status", label: "Status" },
+  ],
   FILAMENT: [
     { key: "brand", label: "Brand", required: true },
     { key: "materialType", label: "Material type", required: true },
@@ -90,6 +175,20 @@ export const importFieldConfigs = {
     { key: "reorderThreshold", label: "Reorder threshold" },
     { key: "status", label: "Status" },
     { key: "storageLocation", label: "Storage location" },
+  ],
+  SAFETY: [
+    { key: "name", label: "Name", required: true },
+    { key: "type", label: "Type", required: true },
+    { key: "status", label: "Status" },
+    { key: "replacementSchedule", label: "Replacement schedule" },
+    { key: "notes", label: "Notes" },
+  ],
+  SMART_PLUG: [
+    { key: "name", label: "Name", required: true },
+    { key: "assignedDeviceLabel", label: "Assigned device label" },
+    { key: "status", label: "Status" },
+    { key: "powerMonitoringCapable", label: "Power monitoring capable" },
+    { key: "notes", label: "Notes" },
   ],
   TOOL_PART: [
     { key: "name", label: "Name", required: true },
@@ -111,6 +210,11 @@ export const importFieldConfigs = {
 
 export type ImportFieldConfig = (typeof importFieldConfigs)[ImportEntityType][number];
 export type ImportFieldMapping = Record<string, string>;
+export type NotesImportGroup = {
+  entityType: ImportEntityType;
+  sourceName: string;
+  records: Record<string, string>[];
+};
 
 function parseBoolean(value: unknown) {
   if (typeof value !== "string") return false;
@@ -215,6 +319,404 @@ function parseWishlistStatus(value: unknown, validationErrors: string[]) {
   }
 
   return normalized as WishlistStatus;
+}
+
+function parsePrinterStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase();
+  if (!normalized) return PrinterStatus.ACTIVE;
+  if (!PRINTER_STATUSES.has(normalized as PrinterStatus)) {
+    validationErrors.push(`invalid printer status: ${value}`);
+    return PrinterStatus.ACTIVE;
+  }
+  return normalized as PrinterStatus;
+}
+
+function parseMaterialSystemType(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) {
+    validationErrors.push("type is required");
+    return MaterialSystemType.DRYER;
+  }
+  if (!MATERIAL_SYSTEM_TYPES.has(normalized as MaterialSystemType)) {
+    validationErrors.push(`invalid material system type: ${value}`);
+    return MaterialSystemType.DRYER;
+  }
+  return normalized as MaterialSystemType;
+}
+
+function parseMaterialSystemStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return MaterialSystemStatus.ACTIVE;
+  if (!MATERIAL_SYSTEM_STATUSES.has(normalized as MaterialSystemStatus)) {
+    validationErrors.push(`invalid material system status: ${value}`);
+    return MaterialSystemStatus.ACTIVE;
+  }
+  return normalized as MaterialSystemStatus;
+}
+
+function parseBuildPlateStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return BuildPlateStatus.AVAILABLE;
+  if (!BUILD_PLATE_STATUSES.has(normalized as BuildPlateStatus)) {
+    validationErrors.push(`invalid build plate status: ${value}`);
+    return BuildPlateStatus.AVAILABLE;
+  }
+  return normalized as BuildPlateStatus;
+}
+
+function parseHotendStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return HotendStatus.AVAILABLE;
+  if (!HOTEND_STATUSES.has(normalized as HotendStatus)) {
+    validationErrors.push(`invalid hotend status: ${value}`);
+    return HotendStatus.AVAILABLE;
+  }
+  return normalized as HotendStatus;
+}
+
+function parseSafetyStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return SafetyStatus.ACTIVE;
+  if (!SAFETY_STATUSES.has(normalized as SafetyStatus)) {
+    validationErrors.push(`invalid safety status: ${value}`);
+    return SafetyStatus.ACTIVE;
+  }
+  return normalized as SafetyStatus;
+}
+
+function parseSmartPlugStatus(value: unknown, validationErrors: string[]) {
+  const normalized = parseOptionalString(value)?.toUpperCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return SmartPlugStatus.ONLINE;
+  if (!SMART_PLUG_STATUSES.has(normalized as SmartPlugStatus)) {
+    validationErrors.push(`invalid smart plug status: ${value}`);
+    return SmartPlugStatus.ONLINE;
+  }
+  return normalized as SmartPlugStatus;
+}
+
+function defaultPrinterBuildVolume(model: string) {
+  const normalized = model.toLowerCase();
+  if (normalized.includes("a1 mini")) return { x: 180, y: 180, z: 180 };
+  if (normalized.includes("p2s")) return { x: 256, y: 256, z: 256 };
+  return { x: 256, y: 256, z: 256 };
+}
+
+function buildRowResolution(status: ImportRowStatus, hasMatch: boolean) {
+  if (status === ImportRowStatus.ERROR || status === ImportRowStatus.CONFLICT) {
+    return ImportRowResolution.SKIP;
+  }
+  return hasMatch ? ImportRowResolution.UPDATE_MATCH : ImportRowResolution.CREATE_NEW;
+}
+
+function sectionCategoryName(section: string) {
+  return section
+    .replace(/&/g, "and")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractBracketNote(value: string) {
+  const match = value.match(/\(([^)]+)\)\s*$/);
+  return {
+    text: value.replace(/\s*\([^)]+\)\s*$/, "").trim(),
+    note: match?.[1]?.trim() ?? null,
+  };
+}
+
+function extractQuantity(value: string) {
+  const parenMatch = value.match(/\(x(\d+)\)\s*$/i);
+  if (parenMatch) {
+    return { text: value.replace(/\s*\(x\d+\)\s*$/i, "").trim(), quantity: parseInt(parenMatch[1], 10) };
+  }
+  const suffixMatch = value.match(/\sx(\d+)\s*$/i);
+  if (suffixMatch) {
+    return { text: value.replace(/\sx\d+\s*$/i, "").trim(), quantity: parseInt(suffixMatch[1], 10) };
+  }
+  return { text: value.trim(), quantity: 1 };
+}
+
+function inferBrand(value: string) {
+  const match = KNOWN_BRANDS.find((brand) => value.startsWith(brand));
+  if (match) return match;
+  return value.split(" ").slice(0, 1).join(" ");
+}
+
+function inferPrinterRecord(line: string) {
+  const name = line.trim();
+  const brand = inferBrand(name);
+  const model = name.replace(`${brand} `, "").trim();
+  const volume = defaultPrinterBuildVolume(model);
+  return {
+    name,
+    brand,
+    model,
+    buildVolumeX: String(volume.x),
+    buildVolumeY: String(volume.y),
+    buildVolumeZ: String(volume.z),
+    status: "ACTIVE",
+  };
+}
+
+function inferMaterialSystemRecord(line: string) {
+  const { text, note } = extractBracketNote(line);
+  const lower = text.toLowerCase();
+  let type = "DRYER";
+  if (lower.includes("ams lite")) type = "AMS_LITE";
+  else if (lower.includes("ams 2")) type = "AMS_2_PRO";
+  else if (lower.includes("ams ht")) type = "AMS_HT";
+
+  return {
+    name: text,
+    type,
+    status: "ACTIVE",
+    notes: note ?? "",
+  };
+}
+
+function inferBuildPlateRecord(line: string) {
+  const { text, note } = extractBracketNote(line);
+  const sizeMatch = text.match(/(\d{3})mm/i);
+  const lower = text.toLowerCase();
+  let surfaceType = "General";
+  if (lower.includes("dual textured/smooth")) surfaceType = "Dual Textured/Smooth";
+  else if (lower.includes("textured")) surfaceType = "Textured";
+  else if (lower.includes("smooth")) surfaceType = "Smooth";
+  else if (lower.includes("engineering")) surfaceType = "Engineering";
+  else if (lower.includes("cool plate")) surfaceType = "Cool Plate";
+
+  return {
+    name: text,
+    sizeLabel: sizeMatch ? `${sizeMatch[1]}mm` : "256mm",
+    sizeMm: sizeMatch?.[1] ?? "256",
+    surfaceType,
+    status: "AVAILABLE",
+    notes: note ?? "",
+  };
+}
+
+function inferHotendRecord(line: string) {
+  const { text: withoutNote, note } = extractBracketNote(line);
+  const { text, quantity } = extractQuantity(withoutNote);
+  const nozzleMatch = text.match(/(\d+(?:\.\d+)?)mm/i);
+  const lower = text.toLowerCase();
+  const materialType = lower.includes("hardened steel")
+    ? "Hardened Steel"
+    : lower.includes("stainless")
+      ? "Stainless"
+      : "Standard";
+  const noteLower = (note ?? "").toLowerCase();
+  const inUseCount =
+    noteLower.includes("one in use") ? 1 : noteLower.includes("in use") ? 1 : 0;
+
+  return {
+    name: text,
+    nozzleSize: nozzleMatch?.[1] ?? "0.4",
+    materialType,
+    quantity: String(quantity),
+    inUseCount: String(inUseCount),
+    spareCount: String(Math.max(0, quantity - inUseCount)),
+    status: inUseCount > 0 ? "IN_USE" : "AVAILABLE",
+    notes: note ?? "",
+  };
+}
+
+function inferFilamentRecord(line: string) {
+  const { text: noNote, note } = extractBracketNote(line);
+  const { text, quantity } = extractQuantity(noNote);
+  const brand = inferBrand(text);
+  const remainder = text.replace(`${brand} `, "").trim();
+  const patterns = [
+    { materialType: "PETG-CF", token: "PETG-CF" },
+    { materialType: "PETG", token: "PETG HF", subtype: "HF" },
+    { materialType: "PLA", token: "PLA+", subtype: "PLA+" },
+    { materialType: "PLA", token: "PLA" },
+    { materialType: "PETG", token: "PETG" },
+    { materialType: "ASA", token: "ASA" },
+    { materialType: "TPU", token: "TPU" },
+  ];
+  const matched = patterns.find((pattern) => remainder.includes(pattern.token)) ?? patterns[3];
+  const [before, after = ""] = remainder.split(matched.token);
+  const finishTokens = ["Matte", "Silk", "Meta", "Metal"];
+  const subtype = matched.subtype ?? (after.trim() || null);
+  const finish = finishTokens.find((token) => before.includes(token) || after.includes(token)) ?? null;
+  const color = before.replace(/\b(Matte|Silk|Meta|Metal)\b/gi, "").trim() || remainder;
+  const lower = remainder.toLowerCase();
+  const abrasive = lower.includes("cf");
+  const dryingRequired = abrasive || matched.materialType === "ASA" || matched.materialType === "TPU";
+  const hygroscopicLevel =
+    abrasive || matched.materialType === "ASA" || matched.materialType === "TPU"
+      ? "HIGH"
+      : matched.materialType === "PETG"
+        ? "MEDIUM"
+        : "LOW";
+
+  return {
+    brand,
+    materialType: matched.materialType,
+    subtype: subtype ?? "",
+    finish: finish ?? "",
+    color,
+    quantity: String(quantity),
+    estimatedRemainingGrams: "1000",
+    abrasive: abrasive ? "true" : "false",
+    dryingRequired: dryingRequired ? "true" : "false",
+    hygroscopicLevel,
+    status: quantity <= 1 ? "HEALTHY" : "HEALTHY",
+    notes: note ?? "",
+  };
+}
+
+function inferConsumableRecord(line: string, section: string) {
+  const { text: withoutNote, note } = extractBracketNote(line);
+  const { text, quantity } = extractQuantity(withoutNote);
+  return {
+    name: text,
+    category: sectionCategoryName(section),
+    quantity: String(quantity),
+    unit: "unit",
+    reorderThreshold: "1",
+    status: quantity <= 1 ? "LOW" : "HEALTHY",
+    notes: note ?? "",
+  };
+}
+
+function inferSafetyRecord(line: string) {
+  const { text, note } = extractBracketNote(line);
+  const lower = text.toLowerCase();
+  const type = lower.includes("filter")
+    ? "Air Filter"
+    : lower.includes("fan") || lower.includes("exhaust")
+      ? "Exhaust"
+      : "Air Quality";
+  return {
+    name: text,
+    type,
+    status: "ACTIVE",
+    notes: note ?? "",
+  };
+}
+
+function inferSmartPlugRecord(line: string) {
+  return {
+    name: line.trim(),
+    assignedDeviceLabel: line.trim(),
+    status: "ONLINE",
+    powerMonitoringCapable: "false",
+  };
+}
+
+function inferToolRecord(line: string, section: string) {
+  const { text: withoutNote, note } = extractBracketNote(line);
+  const { text, quantity } = extractQuantity(withoutNote);
+  return {
+    name: text,
+    category: section.includes("Structural") ? "Structural Component" : "Tools / Parts",
+    quantity: String(quantity),
+    notes: note ?? "",
+  };
+}
+
+function inferWishlistRecord(line: string, category: string) {
+  const cleaned = line.replace(/^-+\s*/, "").trim();
+  const urlMatch = cleaned.match(/\((https?:\/\/[^)]+)\)\s*$/i);
+  const name = cleaned.replace(/\s*\(https?:\/\/[^)]+\)\s*$/i, "").trim();
+  let vendor = "";
+  if (urlMatch) {
+    try {
+      vendor = new URL(urlMatch[1]).hostname.replace(/^www\./, "");
+    } catch {
+      vendor = "";
+    }
+  }
+  const priority =
+    category === "Air Quality & Safety" ? "HIGH" : category === "Filament" ? "HIGH" : "MEDIUM";
+  return {
+    name,
+    category,
+    priority,
+    vendor,
+    purchaseUrl: urlMatch?.[1] ?? "",
+    status: "PLANNED",
+  };
+}
+
+export function parseInventoryNotes(text: string): NotesImportGroup[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const groups = new Map<ImportEntityType, Record<string, string>[]>();
+  const push = (entityType: ImportEntityType, record: Record<string, string>) => {
+    const items = groups.get(entityType) ?? [];
+    items.push(record);
+    groups.set(entityType, items);
+  };
+
+  let section: string | null = null;
+  let wishlistCategory: string | null = null;
+
+  const isSectionHeading = (line: string) =>
+    [
+      "Printers",
+      "Automatic Material System (AMS) / Dryers",
+      "Build Plates",
+      "Hotends",
+      "Filament",
+      "Consumables & Maintenance",
+      "Safety & Air Quality",
+      "Extra Structural Printer Components",
+      "Smart Plugs",
+      "Related Tools and Parts",
+      "Items to Buy:",
+      "Filament:",
+      "Workspace:",
+      "Air Quality & Safety:",
+    ].includes(line);
+
+  for (const line of lines) {
+    if (line === "3D Printing Setup") {
+      continue;
+    }
+
+    if (isSectionHeading(line)) {
+      if (line === "Items to Buy:") {
+        section = "Wishlist";
+        wishlistCategory = null;
+      } else if (section === "Wishlist" && line.endsWith(":")) {
+        wishlistCategory = line.replace(/:$/, "");
+      } else {
+        section = line;
+      }
+      continue;
+    }
+
+    if (!section) continue;
+
+    if (section === "Printers") push(ImportEntityType.PRINTER, inferPrinterRecord(line));
+    else if (section === "Automatic Material System (AMS) / Dryers") push(ImportEntityType.MATERIAL_SYSTEM, inferMaterialSystemRecord(line));
+    else if (section === "Build Plates") push(ImportEntityType.BUILD_PLATE, inferBuildPlateRecord(line));
+    else if (section === "Hotends") push(ImportEntityType.HOTEND, inferHotendRecord(line));
+    else if (section === "Filament") push(ImportEntityType.FILAMENT, inferFilamentRecord(line));
+    else if (section === "Consumables & Maintenance") push(ImportEntityType.CONSUMABLE, inferConsumableRecord(line, section));
+    else if (section === "Safety & Air Quality") push(ImportEntityType.SAFETY, inferSafetyRecord(line));
+    else if (section === "Smart Plugs") push(ImportEntityType.SMART_PLUG, inferSmartPlugRecord(line));
+    else if (section === "Extra Structural Printer Components" || section === "Related Tools and Parts") {
+      push(ImportEntityType.TOOL_PART, inferToolRecord(line, section));
+    } else if (section === "Wishlist" && wishlistCategory && line.startsWith("-")) {
+      push(ImportEntityType.WISHLIST, inferWishlistRecord(line, wishlistCategory));
+    }
+  }
+
+  return Array.from(groups.entries()).map(([entityType, records]) => ({
+    entityType,
+    sourceName: `Notes paste ${titleLabel(entityType)}`,
+    records,
+  }));
+}
+
+function titleLabel(entityType: ImportEntityType) {
+  return entityType.toLowerCase().replaceAll("_", " ");
 }
 
 function finalizeRows(rows: StagedRow[]) {
@@ -356,6 +858,195 @@ async function stageFilamentRows(
         dryerSuggested: parseBoolean(record.dryerSuggested),
         hardenedNozzleNeeded: parseBoolean(record.hardenedNozzleNeeded),
         recommendationNotes: parseOptionalString(record.recommendationNotes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
+async function stagePrinterRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.printer.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const brand = record.brand?.trim();
+    const model = record.model?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+    if (!brand) validationErrors.push("brand is required");
+    if (!model) validationErrors.push("model is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+    const buildVolume = defaultPrinterBuildVolume(model ?? "");
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        brand,
+        model,
+        buildVolumeX: parseInteger(record.buildVolumeX, buildVolume.x),
+        buildVolumeY: parseInteger(record.buildVolumeY, buildVolume.y),
+        buildVolumeZ: parseInteger(record.buildVolumeZ, buildVolume.z),
+        location: parseOptionalString(record.location),
+        status: parsePrinterStatus(record.status, validationErrors),
+        notes: parseOptionalString(record.notes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
+async function stageMaterialSystemRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.materialSystem.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        type: parseMaterialSystemType(record.type, validationErrors),
+        status: parseMaterialSystemStatus(record.status, validationErrors),
+        supportedMaterialsNotes: parseOptionalString(record.supportedMaterialsNotes),
+        notes: parseOptionalString(record.notes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
+async function stageBuildPlateRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.buildPlate.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const sizeLabel = record.sizeLabel?.trim();
+    const surfaceType = record.surfaceType?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+    if (!sizeLabel) validationErrors.push("sizeLabel is required");
+    if (!surfaceType) validationErrors.push("surfaceType is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        sizeLabel,
+        sizeMm: parseInteger(record.sizeMm, parseInteger(sizeLabel?.replace(/[^\d]/g, ""), 256)),
+        surfaceType,
+        status: parseBuildPlateStatus(record.status, validationErrors),
+        notes: parseOptionalString(record.notes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
+async function stageHotendRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.hotend.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const materialType = record.materialType?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+    if (!materialType) validationErrors.push("materialType is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+    const quantity = parseInteger(record.quantity, 1);
+    const inUseCount = parseInteger(record.inUseCount, 0);
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        nozzleSize: parseDecimal(record.nozzleSize, 0.4),
+        materialType,
+        quantity,
+        inUseCount,
+        spareCount: parseInteger(record.spareCount, Math.max(0, quantity - inUseCount)),
+        status: parseHotendStatus(record.status, validationErrors),
+        notes: parseOptionalString(record.notes),
       },
     };
   });
@@ -533,6 +1224,92 @@ async function stageWishlistRows(
   return finalizeRows(rows);
 }
 
+async function stageSafetyRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.safetyEquipment.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const type = record.type?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+    if (!type) validationErrors.push("type is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        type,
+        status: parseSafetyStatus(record.status, validationErrors),
+        replacementSchedule: parseOptionalString(record.replacementSchedule),
+        notes: parseOptionalString(record.notes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
+async function stageSmartPlugRows(
+  workspaceId: string,
+  records: Record<string, string>[],
+): Promise<StagedRow[]> {
+  const existing = await prisma.smartPlug.findMany({
+    where: { workspaceId },
+    select: { id: true, slug: true },
+  });
+
+  const rows = records.map((record, index) => {
+    const name = record.name?.trim();
+    const validationErrors: string[] = [];
+    if (!name) validationErrors.push("name is required");
+
+    const fingerprint = slugify(name ?? `row-${index + 1}`);
+    const match = existing.find((item) => item.slug === fingerprint);
+    const status =
+      validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
+
+    return {
+      rowIndex: index + 1,
+      status,
+      resolution: buildRowResolution(status, Boolean(match)),
+      fingerprint,
+      suggestedMatchId: match?.id,
+      suggestedMatchSlug: match?.slug,
+      resolvedMatchId: match?.id,
+      resolvedMatchSlug: match?.slug,
+      validationErrors,
+      data: {
+        name,
+        assignedDeviceLabel: parseOptionalString(record.assignedDeviceLabel),
+        status: parseSmartPlugStatus(record.status, validationErrors),
+        powerMonitoringCapable: parseBoolean(record.powerMonitoringCapable),
+        notes: parseOptionalString(record.notes),
+      },
+    };
+  });
+
+  return finalizeRows(rows);
+}
+
 export async function stageImportRecords(
   workspaceId: string,
   entityType: ImportEntityType,
@@ -545,10 +1322,22 @@ export async function stageImportRecords(
       : records;
 
   switch (entityType) {
+    case ImportEntityType.PRINTER:
+      return stagePrinterRows(workspaceId, mappedRecords);
+    case ImportEntityType.MATERIAL_SYSTEM:
+      return stageMaterialSystemRows(workspaceId, mappedRecords);
+    case ImportEntityType.BUILD_PLATE:
+      return stageBuildPlateRows(workspaceId, mappedRecords);
+    case ImportEntityType.HOTEND:
+      return stageHotendRows(workspaceId, mappedRecords);
     case ImportEntityType.FILAMENT:
       return stageFilamentRows(workspaceId, mappedRecords);
     case ImportEntityType.CONSUMABLE:
       return stageConsumableRows(workspaceId, mappedRecords);
+    case ImportEntityType.SAFETY:
+      return stageSafetyRows(workspaceId, mappedRecords);
+    case ImportEntityType.SMART_PLUG:
+      return stageSmartPlugRows(workspaceId, mappedRecords);
     case ImportEntityType.TOOL_PART:
       return stageToolRows(workspaceId, mappedRecords);
     case ImportEntityType.WISHLIST:
@@ -635,6 +1424,102 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
       }
 
       const payload = row.data as Record<string, unknown>;
+
+      if (job.entityType === ImportEntityType.PRINTER) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          brand: String(payload.brand ?? ""),
+          model: String(payload.model ?? ""),
+          buildVolumeX: Number(payload.buildVolumeX ?? 256),
+          buildVolumeY: Number(payload.buildVolumeY ?? 256),
+          buildVolumeZ: Number(payload.buildVolumeZ ?? 256),
+          location: (payload.location as string | null) ?? null,
+          status: String(payload.status ?? PrinterStatus.ACTIVE) as PrinterStatus,
+          notes: (payload.notes as string | null) ?? null,
+        };
+
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.printer.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.printer.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
+
+      if (job.entityType === ImportEntityType.MATERIAL_SYSTEM) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          type: String(payload.type ?? MaterialSystemType.DRYER) as MaterialSystemType,
+          status: String(payload.status ?? MaterialSystemStatus.ACTIVE) as MaterialSystemStatus,
+          supportedMaterialsNotes: (payload.supportedMaterialsNotes as string | null) ?? null,
+          notes: (payload.notes as string | null) ?? null,
+        };
+
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.materialSystem.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.materialSystem.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
+
+      if (job.entityType === ImportEntityType.BUILD_PLATE) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          sizeLabel: String(payload.sizeLabel ?? ""),
+          sizeMm: Number(payload.sizeMm ?? 256),
+          surfaceType: String(payload.surfaceType ?? ""),
+          status: String(payload.status ?? BuildPlateStatus.AVAILABLE) as BuildPlateStatus,
+          notes: (payload.notes as string | null) ?? null,
+        };
+
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.buildPlate.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.buildPlate.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
+
+      if (job.entityType === ImportEntityType.HOTEND) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          nozzleSize: Number(payload.nozzleSize ?? 0.4),
+          materialType: String(payload.materialType ?? ""),
+          quantity: Number(payload.quantity ?? 1),
+          inUseCount: Number(payload.inUseCount ?? 0),
+          spareCount: Number(payload.spareCount ?? 0),
+          status: String(payload.status ?? HotendStatus.AVAILABLE) as HotendStatus,
+          notes: (payload.notes as string | null) ?? null,
+        };
+
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.hotend.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.hotend.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
 
       if (job.entityType === ImportEntityType.FILAMENT) {
         const common = {
@@ -724,6 +1609,48 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           });
         } else {
           await tx.consumableItem.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
+
+      if (job.entityType === ImportEntityType.SAFETY) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          type: String(payload.type ?? ""),
+          status: String(payload.status ?? SafetyStatus.ACTIVE) as SafetyStatus,
+          replacementSchedule: (payload.replacementSchedule as string | null) ?? null,
+          notes: (payload.notes as string | null) ?? null,
+        };
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.safetyEquipment.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.safetyEquipment.create({
+            data: { workspaceId, ...common },
+          });
+        }
+      }
+
+      if (job.entityType === ImportEntityType.SMART_PLUG) {
+        const common = {
+          name: String(payload.name ?? ""),
+          slug: slugify(String(payload.name ?? "")),
+          assignedDeviceLabel: (payload.assignedDeviceLabel as string | null) ?? null,
+          status: String(payload.status ?? SmartPlugStatus.ONLINE) as SmartPlugStatus,
+          powerMonitoringCapable: Boolean(payload.powerMonitoringCapable),
+          notes: (payload.notes as string | null) ?? null,
+        };
+        if (row.resolution === ImportRowResolution.UPDATE_MATCH && row.resolvedMatchId) {
+          await tx.smartPlug.update({
+            where: { id: row.resolvedMatchId },
+            data: common,
+          });
+        } else {
+          await tx.smartPlug.create({
             data: { workspaceId, ...common },
           });
         }

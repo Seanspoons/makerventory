@@ -20,6 +20,7 @@ import {
   createImportJobWithRows,
   importFieldConfigs,
   importEntityOptions,
+  parseInventoryNotes,
   readCsvFile,
   stageImportRecords,
 } from "@/lib/imports";
@@ -1408,6 +1409,65 @@ export async function stageImportJob(formData: FormData) {
     importJobId: job.id,
     entityType,
     totalRows: job.totalRows,
+  });
+  revalidatePath("/imports");
+}
+
+export async function stageInventoryNotesImport(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
+  const notesText = requiredString(formData, "notesText");
+  const sourceLabel = optionalString(formData, "sourceName") ?? "Notes paste";
+
+  const groups = parseInventoryNotes(notesText);
+  if (groups.length === 0) {
+    await setFlashMessage({
+      type: "error",
+      title: "Nothing to stage",
+      message: "No supported inventory sections were found in the pasted notes.",
+    });
+    revalidatePath("/imports");
+    return;
+  }
+
+  const jobs = [];
+  for (const group of groups) {
+    const rows = await stageImportRecords(workspaceId, group.entityType, group.records);
+    const job = await createImportJobWithRows({
+      workspaceId,
+      userId,
+      entityType: group.entityType,
+      sourceName: `${sourceLabel} · ${group.sourceName}`,
+      originalFilename: "notes-paste.txt",
+      notes: "Staged from pasted inventory notes.",
+      rows,
+    });
+    jobs.push(job);
+
+    await logAuditEvent({
+      workspaceId,
+      userId,
+      actionType: "IMPORT_STAGE",
+      entityType: group.entityType,
+      entityId: job.id,
+      entityLabel: job.sourceName,
+      summary: `Staged ${job.totalRows} row(s) from pasted notes for ${group.entityType.toLowerCase().replaceAll("_", " ")}.`,
+      metadata: {
+        source: "notes-paste",
+        totalRows: job.totalRows,
+      },
+    });
+  }
+
+  await setFlashMessage({
+    type: "success",
+    title: "Notes import staged",
+    message: `${jobs.length} staged import job(s) were created from the pasted notes.`,
+  });
+  logInfo("imports.notes_stage_succeeded", {
+    ...logContext,
+    stagedJobs: jobs.length,
+    entityTypes: jobs.map((job) => job.entityType),
   });
   revalidatePath("/imports");
 }

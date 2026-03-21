@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   applyStagedImport,
   stageImportJob,
+  stageInventoryNotesImport,
   updateImportRowDecision,
   updateImportRowResolution,
 } from "@/app/actions";
@@ -80,7 +81,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         <SectionCard
           title="Stage CSV import"
           description="Upload a focused CSV, review the staged rows, and apply changes deliberately so your workshop data stays clean and organized."
@@ -172,37 +173,69 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         </SectionCard>
 
         <SectionCard
-          title="Review checklist"
-          description="Treat staged imports as a controlled change set. Resolve conflicts before apply and keep notes about how the source data was normalized."
+          title="Paste inventory notes"
+          description="Paste Apple Notes or similar text exports and stage multiple inventory jobs from one structured note."
         >
-          <div className="space-y-4 text-sm leading-6 text-slate-600">
-            <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-              <p className="font-medium text-slate-950">Before apply</p>
+          <form action={stageInventoryNotesImport} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm text-slate-500">Source label</label>
+              <Input
+                name="sourceName"
+                placeholder="Apple Notes workshop inventory"
+                maxLength={80}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-slate-500">Pasted notes</label>
+              <Textarea
+                name="notesText"
+                placeholder="Paste your structured workshop notes here"
+                className="min-h-[280px]"
+                required
+              />
+            </div>
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
+              <p className="font-medium text-slate-950">Supported headings</p>
               <p className="mt-2">
-                Confirm matched rows are true updates, not accidental collisions from overly broad names.
+                Printers, Automatic Material System (AMS) / Dryers, Build Plates, Hotends, Filament, Consumables &amp; Maintenance, Safety &amp; Air Quality, Extra Structural Printer Components, Smart Plugs, Related Tools and Parts, and Items to Buy.
               </p>
             </div>
-            <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-              <p className="font-medium text-slate-950">Conflicts</p>
-              <p className="mt-2">
-                Rows marked <span className="font-medium text-rose-700">Conflict</span> or <span className="font-medium text-rose-700">Error</span> will not apply. Clean the CSV and re-stage.
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-              <p className="font-medium text-slate-950">Production path</p>
-              <p className="mt-2">
-                Use staged imports to bring in real workshop data carefully, review each row, and avoid messy bulk changes.
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-              <p className="font-medium text-slate-950">Per-row control</p>
-              <p className="mt-2">
-                Skip rows you do not want applied yet, then re-queue them later without re-uploading the whole file.
-              </p>
-            </div>
-          </div>
+            <SubmitButton>Stage notes import</SubmitButton>
+          </form>
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Review checklist"
+        description="Treat staged imports as a controlled change set. Resolve conflicts before apply and keep notes about how the source data was normalized."
+      >
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <p className="font-medium text-slate-950">Before apply</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Confirm matched rows are true updates, not accidental collisions from overly broad names.
+            </p>
+          </div>
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <p className="font-medium text-slate-950">Conflicts</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Rows marked <span className="font-medium text-rose-700">Conflict</span> or <span className="font-medium text-rose-700">Error</span> will not apply. Clean the source and re-stage.
+            </p>
+          </div>
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <p className="font-medium text-slate-950">Notes paste path</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              One pasted note can stage multiple jobs, grouped by section, so you can review each inventory domain separately.
+            </p>
+          </div>
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <p className="font-medium text-slate-950">Per-row control</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Skip rows you do not want applied yet, then re-queue or switch them to create-vs-update without re-uploading everything.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
 
       <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
         <SectionCard

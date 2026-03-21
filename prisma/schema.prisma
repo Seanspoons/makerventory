@@ -103,8 +103,14 @@ enum FilamentHygroscopicLevel {
 }
 
 enum ImportEntityType {
+  PRINTER
+  MATERIAL_SYSTEM
+  BUILD_PLATE
+  HOTEND
   FILAMENT
   CONSUMABLE
+  SAFETY
+  SMART_PLUG
   TOOL_PART
   WISHLIST
 }
