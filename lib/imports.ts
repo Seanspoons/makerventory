@@ -18,7 +18,7 @@ import {
 import type { ImportEntityType } from "@prisma/client";
 import { parse } from "csv-parse/sync";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/utils";
+import { deriveConsumableStatus, slugify } from "@/lib/utils";
 
 const MAX_IMPORT_BYTES = 1024 * 1024;
 
@@ -80,13 +80,13 @@ export const importEntityOptions = [
     value: "BUILD_PLATE" as const,
     label: "Build Plates",
     description:
-      "Columns: name, sizeLabel, sizeMm, surfaceType, status, notes.",
+      "Columns: name, sizeMm, surfaceType, status, notes.",
   },
   {
     value: "HOTEND" as const,
     label: "Hotends",
     description:
-      "Columns: name, nozzleSize, materialType, quantity, inUseCount, spareCount, status, notes.",
+      "Columns: name, nozzleSize, materialType, quantity, status, notes.",
   },
   {
     value: "FILAMENT" as const,
@@ -98,7 +98,7 @@ export const importEntityOptions = [
     value: "CONSUMABLE" as const,
     label: "Consumables",
     description:
-      "Columns: name, category, quantity, unit, reorderThreshold, status, storageLocation.",
+      "Columns: name, category, quantity, unit, reorderThreshold, storageLocation.",
   },
   {
     value: "SAFETY" as const,
@@ -165,7 +165,6 @@ export const importFieldConfigs = {
   ],
   BUILD_PLATE: [
     { key: "name", label: "Name", required: true },
-    { key: "sizeLabel", label: "Size label", required: true },
     { key: "sizeMm", label: "Size mm", required: true },
     { key: "surfaceType", label: "Surface type", required: true },
     { key: "status", label: "Status" },
@@ -176,8 +175,6 @@ export const importFieldConfigs = {
     { key: "nozzleSize", label: "Nozzle size", required: true },
     { key: "materialType", label: "Material type", required: true },
     { key: "quantity", label: "Quantity" },
-    { key: "inUseCount", label: "In use count" },
-    { key: "spareCount", label: "Spare count" },
     { key: "status", label: "Status" },
   ],
   FILAMENT: [
@@ -196,7 +193,6 @@ export const importFieldConfigs = {
     { key: "quantity", label: "Quantity" },
     { key: "unit", label: "Unit", required: true },
     { key: "reorderThreshold", label: "Reorder threshold" },
-    { key: "status", label: "Status" },
     { key: "storageLocation", label: "Storage location" },
   ],
   SAFETY: [
@@ -517,7 +513,6 @@ function inferBuildPlateRecord(line: string) {
 
   return {
     name: text,
-    sizeLabel: sizeMatch ? `${sizeMatch[1]}mm` : "256mm",
     sizeMm: sizeMatch?.[1] ?? "256",
     surfaceType,
     status: "AVAILABLE",
@@ -535,18 +530,13 @@ function inferHotendRecord(line: string) {
     : lower.includes("stainless")
       ? "Stainless"
       : "Standard";
-  const noteLower = (note ?? "").toLowerCase();
-  const inUseCount =
-    noteLower.includes("one in use") ? 1 : noteLower.includes("in use") ? 1 : 0;
 
   return {
     name: text,
     nozzleSize: nozzleMatch?.[1] ?? "0.4",
     materialType,
     quantity: String(quantity),
-    inUseCount: String(inUseCount),
-    spareCount: String(Math.max(0, quantity - inUseCount)),
-    status: inUseCount > 0 ? "IN_USE" : "AVAILABLE",
+    status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
     notes: note ?? "",
   };
 }
@@ -1010,12 +1000,12 @@ async function stageBuildPlateRows(
 
   const rows = records.map((record, index) => {
     const name = record.name?.trim();
-    const sizeLabel = record.sizeLabel?.trim();
     const surfaceType = record.surfaceType?.trim();
     const validationErrors: string[] = [];
     if (!name) validationErrors.push("name is required");
-    if (!sizeLabel) validationErrors.push("sizeLabel is required");
     if (!surfaceType) validationErrors.push("surfaceType is required");
+    const sizeMm = parseInteger(record.sizeMm, 0);
+    if (sizeMm <= 0) validationErrors.push("sizeMm must be greater than 0");
 
     const fingerprint = slugify(name ?? `row-${index + 1}`);
     const match = existing.find((item) => item.slug === fingerprint);
@@ -1034,8 +1024,7 @@ async function stageBuildPlateRows(
       validationErrors,
       data: {
         name,
-        sizeLabel,
-        sizeMm: parseInteger(record.sizeMm, parseInteger(sizeLabel?.replace(/[^\d]/g, ""), 256)),
+        sizeMm,
         surfaceType,
         status: parseBuildPlateStatus(record.status, validationErrors),
         notes: parseOptionalString(record.notes),
@@ -1067,7 +1056,6 @@ async function stageHotendRows(
     const status =
       validationErrors.length > 0 ? ImportRowStatus.ERROR : match ? ImportRowStatus.MATCHED : ImportRowStatus.NEW;
     const quantity = parseInteger(record.quantity, 1);
-    const inUseCount = parseInteger(record.inUseCount, 0);
 
     return {
       rowIndex: index + 1,
@@ -1084,8 +1072,6 @@ async function stageHotendRows(
         nozzleSize: parseDecimal(record.nozzleSize, 0.4),
         materialType,
         quantity,
-        inUseCount,
-        spareCount: parseInteger(record.spareCount, Math.max(0, quantity - inUseCount)),
         status: parseHotendStatus(record.status, validationErrors),
         notes: parseOptionalString(record.notes),
       },
@@ -1144,7 +1130,6 @@ async function stageConsumableRows(
         quantity: parseDecimal(record.quantity, 1),
         unit,
         reorderThreshold: parseDecimal(record.reorderThreshold, 1),
-        status: parseStockStatus(record.status, validationErrors),
         storageLocation: parseOptionalString(record.storageLocation),
         notes: parseOptionalString(record.notes),
       },
@@ -1519,7 +1504,6 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
         const common = {
           name: String(payload.name ?? ""),
           slug: slugify(String(payload.name ?? "")),
-          sizeLabel: String(payload.sizeLabel ?? ""),
           sizeMm: Number(payload.sizeMm ?? 256),
           surfaceType: String(payload.surfaceType ?? ""),
           status: String(payload.status ?? BuildPlateStatus.AVAILABLE) as BuildPlateStatus,
@@ -1545,8 +1529,6 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           nozzleSize: Number(payload.nozzleSize ?? 0.4),
           materialType: String(payload.materialType ?? ""),
           quantity: Number(payload.quantity ?? 1),
-          inUseCount: Number(payload.inUseCount ?? 0),
-          spareCount: Number(payload.spareCount ?? 0),
           status: String(payload.status ?? HotendStatus.AVAILABLE) as HotendStatus,
           notes: (payload.notes as string | null) ?? null,
         };
@@ -1640,7 +1622,10 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
           quantity: Number(payload.quantity ?? 1),
           unit: String(payload.unit ?? ""),
           reorderThreshold: Number(payload.reorderThreshold ?? 1),
-          status: String(payload.status ?? StockStatus.HEALTHY) as StockStatus,
+          status: deriveConsumableStatus(
+            Number(payload.quantity ?? 1),
+            Number(payload.reorderThreshold ?? 1),
+          ),
           storageLocation: (payload.storageLocation as string | null) ?? null,
           notes: (payload.notes as string | null) ?? null,
         };

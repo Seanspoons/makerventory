@@ -26,6 +26,11 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
     return (q ? haystack.includes(q) : true) && (material === "ALL" ? true : item.materialType === material);
   });
   const detail = filtered.find((item) => item.id === selected) ?? filtered[0] ?? null;
+  const installedCount = filtered.reduce((sum, item) => sum + (item.installedOnPrinter ? 1 : 0), 0);
+  const spareCount = filtered.reduce(
+    (sum, item) => sum + Math.max(item.quantity - (item.installedOnPrinter ? 1 : 0), 0),
+    0,
+  );
 
   return (
     <div className="space-y-5">
@@ -53,11 +58,11 @@ export default async function HotendsPage(props: { searchParams?: SearchParams }
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-500">In use</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">{filtered.reduce((sum, item) => sum + item.inUseCount, 0)}</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{installedCount}</p>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-500">Spare count</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">{filtered.reduce((sum, item) => sum + item.spareCount, 0)}</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{spareCount}</p>
         </div>
       </div>
 

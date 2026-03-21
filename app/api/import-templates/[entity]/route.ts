@@ -10,20 +10,20 @@ const templates: Record<string, string> = {
     'Bambu Lab AMS Lite,AMS_LITE,ACTIVE,"PLA, PETG","Four-slot feeder"',
   ].join("\n"),
   build_plate: [
-    "name,sizeLabel,sizeMm,surfaceType,status,notes",
-    'Bambu Lab Textured Build Plate 180mm,180mm,180,Textured,AVAILABLE,"A1 Mini compatible"',
+    "name,sizeMm,surfaceType,status,notes",
+    'Bambu Lab Textured Build Plate 180mm,180,Textured,AVAILABLE,"A1 Mini compatible"',
   ].join("\n"),
   hotend: [
-    "name,nozzleSize,materialType,quantity,inUseCount,spareCount,status,notes",
-    'A1 Mini 0.4mm Hardened Steel,0.4,Hardened Steel,1,1,0,IN_USE,"Current abrasive-ready setup"',
+    "name,nozzleSize,materialType,quantity,status,notes",
+    'A1 Mini 0.4mm Hardened Steel,0.4,Hardened Steel,1,AVAILABLE,"Current abrasive-ready setup"',
   ].join("\n"),
   filament: [
     "brand,materialType,color,quantity,estimatedRemainingGrams,abrasive,dryingRequired,hygroscopicLevel,storageLocation,notes,recommendedNozzle,dryerSuggested,hardenedNozzleNeeded,recommendationNotes",
     'Polymaker,PLA,Army Green,2,1000,false,false,LOW,Shelf A,"Primary prototyping stock",Standard 0.4mm,false,false,"General purpose PLA"',
   ].join("\n"),
   consumable: [
-    "name,category,quantity,unit,reorderThreshold,status,storageLocation,notes",
-    'Isopropyl Alcohol,Cleaning,2,bottle,1,HEALTHY,Cabinet,"99 percent IPA"',
+    "name,category,quantity,unit,reorderThreshold,storageLocation,notes",
+    'Isopropyl Alcohol,Cleaning,2,bottle,1,Cabinet,"99 percent IPA"',
   ].join("\n"),
   safety: [
     "name,type,status,replacementSchedule,notes",

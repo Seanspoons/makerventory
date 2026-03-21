@@ -390,7 +390,6 @@ model BuildPlate {
   workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name               String
   slug               String
-  sizeLabel          String
   sizeMm             Int
   surfaceType        String
   status             BuildPlateStatus   @default(AVAILABLE)
@@ -414,8 +413,6 @@ model Hotend {
   nozzleSize         Decimal            @db.Decimal(4, 2)
   materialType       String
   quantity           Int                @default(1)
-  inUseCount         Int                @default(0)
-  spareCount         Int                @default(0)
   status             HotendStatus       @default(AVAILABLE)
   notes              String?            @db.Text
   imageUrl           String?

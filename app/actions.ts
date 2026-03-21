@@ -165,8 +165,6 @@ async function setPrinterInstalledHotend(
       await tx.hotend.update({
         where: { id: candidateId },
         data: {
-          inUseCount: assignedCount,
-          spareCount: Math.max(hotend.quantity - assignedCount, 0),
           status:
             hotend.status === "RETIRED"
               ? "RETIRED"
@@ -381,7 +379,6 @@ export async function createInventoryItem(formData: FormData) {
           workspaceId,
           name,
           slug: `${slugify(name)}-${Date.now()}`,
-          sizeLabel: `${sizeMm.toString()}mm`,
           sizeMm,
           surfaceType: requiredString(formData, "surfaceType"),
           notes: optionalString(formData, "notes"),
@@ -402,7 +399,6 @@ export async function createInventoryItem(formData: FormData) {
           nozzleSize: numberValue(formData, "nozzleSize", 0.4),
           materialType: requiredString(formData, "materialType"),
           quantity,
-          spareCount: Math.max(0, quantity),
           notes: optionalString(formData, "notes"),
         },
       });
@@ -748,7 +744,6 @@ export async function updateInventoryItem(formData: FormData) {
           where: { id },
           data: {
             name: requiredString(formData, "name"),
-            sizeLabel: `${sizeMm.toString()}mm`,
             sizeMm,
             surfaceType: requiredString(formData, "surfaceType"),
             status: requiredString(formData, "status") as
@@ -781,8 +776,6 @@ export async function updateInventoryItem(formData: FormData) {
             nozzleSize: numberValue(formData, "nozzleSize", 0.4),
             materialType: requiredString(formData, "materialType"),
             quantity,
-            inUseCount: 0,
-            spareCount: quantity,
             status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
             notes: optionalString(formData, "notes"),
           },
@@ -799,8 +792,6 @@ export async function updateInventoryItem(formData: FormData) {
           await tx.hotend.update({
             where: { id },
             data: {
-              inUseCount: 0,
-              spareCount: quantity,
               status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
             },
           });
