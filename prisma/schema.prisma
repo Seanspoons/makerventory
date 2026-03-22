@@ -250,6 +250,7 @@ model ImportJob {
   originalFilename String
   notes            String?         @db.Text
   fieldMapping     Json?
+  lastBulkAction   Json?
   totalRows        Int             @default(0)
   newRows          Int             @default(0)
   matchedRows      Int             @default(0)

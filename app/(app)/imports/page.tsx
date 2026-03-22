@@ -5,8 +5,10 @@ import { format } from "date-fns";
 import {
   applyAllStagedImports,
   applyStagedImport,
+  stageCorrectionImportReview,
   stageImportJob,
   stageInventoryNotesImport,
+  undoImportJobBulkUpdate,
   updateImportJobRowsBulk,
   updateImportRowDecision,
   updateImportRowResolution,
@@ -62,73 +64,15 @@ function canSkipRow(status: ImportRowStatus) {
 }
 
 function resolutionLabel(resolution: ImportRowResolution) {
-  if (resolution === "UPDATE_MATCH") return "Update match";
-  if (resolution === "SKIP") return "Skip";
-  return "Create new";
+  if (resolution === "UPDATE_MATCH") return "Update matched item";
+  if (resolution === "SKIP") return "Keep staged for later";
+  return "Create as new item";
 }
 
-function rowGuidance(row: {
-  status: ImportRowStatus;
-  resolution: ImportRowResolution;
-  validationErrors: string[];
-  suggestedMatchSlug: string | null;
-}) {
-  if (row.status === ImportRowStatus.CONFLICT) {
-    return {
-      tone: "rose" as const,
-      label: "Blocked",
-      detail: "Conflict detected. Clean the source or split the import before restaging.",
-    };
-  }
-
-  if (row.status === ImportRowStatus.ERROR) {
-    return {
-      tone: "rose" as const,
-      label: "Validation issue",
-      detail: row.validationErrors[0] ?? "This row has validation issues and cannot apply yet.",
-    };
-  }
-
-  if (row.status === ImportRowStatus.MATCHED) {
-    return {
-      tone: "amber" as const,
-      label: "Review match",
-      detail:
-        row.resolution === "UPDATE_MATCH"
-          ? "This row will update the suggested match when applied."
-          : row.suggestedMatchSlug
-            ? "Check the suggested match before applying this row."
-            : "Matched rows should be verified before apply.",
-    };
-  }
-
-  if (row.status === ImportRowStatus.SKIPPED || row.resolution === "SKIP") {
-    return {
-      tone: "slate" as const,
-      label: "Skipped",
-      detail: "This row is out of the apply set until you re-queue it.",
-    };
-  }
-
-  if (row.status === ImportRowStatus.APPLIED) {
-    return {
-      tone: "emerald" as const,
-      label: "Applied",
-      detail: "This row has already been written into workspace inventory.",
-    };
-  }
-
-  return {
-    tone: "emerald" as const,
-    label: "Ready",
-    detail: "This row is ready to create a new record when you apply the job.",
-  };
-}
-
-function guidanceToneClasses(tone: "rose" | "amber" | "emerald" | "slate") {
-  if (tone === "rose") return "border-rose-200 bg-rose-50 text-rose-800";
-  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+function reviewToneClasses(severity: "blocker" | "warning" | "info" | "safe") {
+  if (severity === "blocker") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (severity === "safe") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
@@ -143,7 +87,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
   const selectedEntityType = importEntityOptions.some((option) => option.value === entityTypeParam)
     ? entityTypeParam
     : "FILAMENT";
-  const { jobs, selectedJob } = await getImportJobs(selected);
+  const { jobs, selectedJob, selectedJobActivity } = await getImportJobs(selected);
   const selectedRowFilter = rowStatusFilters.some((filter) => filter.value === rowStatusParam)
     ? rowStatusParam
     : "all";
@@ -155,6 +99,10 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
     selectedJob?.rows.filter(
       (row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED,
     ) ?? [];
+  const reviewRows =
+    selectedJob?.rows.filter((row) => row.review.severity === "warning") ?? [];
+  const safeRows =
+    selectedJob?.rows.filter((row) => row.review.severity === "safe") ?? [];
   const blockedRows =
     selectedJob?.rows.filter(
       (row) => row.status === ImportRowStatus.CONFLICT || row.status === ImportRowStatus.ERROR,
@@ -482,7 +430,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       <p>Matched</p>
                     </div>
                     <div>
-                      <p className="font-medium">{job.conflictRows + job.skippedRows}</p>
+                      <p className="font-medium">{job.conflictRows}</p>
                       <p>Blocked</p>
                     </div>
                   </div>
@@ -503,29 +451,6 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
         >
           {selectedJob ? (
             <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">New</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{selectedJob.newRows}</p>
-                </div>
-                <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Matched</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{selectedJob.matchedRows}</p>
-                </div>
-                <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Blocked</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">
-                    {selectedJob.conflictRows + selectedJob.skippedRows}
-                  </p>
-                </div>
-                <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Ready</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">
-                    {actionableRows.length}
-                  </p>
-                </div>
-              </div>
-
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
                 <div className="text-sm text-slate-600">
                   <p className="font-medium text-slate-950">
@@ -542,11 +467,11 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                 </div>
                 {selectedJob.status === "STAGED" ? (
                   <div className="w-full sm:w-auto">
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
                       <ConfirmActionForm
                         action={applyStagedImport}
                         title="Apply staged import"
-                        description="This writes staged rows into your workspace inventory. Blocked rows will remain staged and unapplied."
+                        description="This writes ready rows into your workspace inventory. Blocked rows stay staged, and you can stage a correction review later if follow-up changes are needed."
                         confirmLabel="Apply import"
                         triggerLabel="Apply all ready rows"
                         triggerVariant="secondary"
@@ -554,62 +479,142 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                         <input type="hidden" name="jobId" value={selectedJob.id} />
                         <input type="hidden" name="returnTo" value={selectedJobHref} />
                         <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
-                          {actionableRows.length} row(s) are eligible to apply in this job.
+                          {actionableRows.length} row(s) are currently eligible. {reviewRows.length} matched row(s) should be reviewed before you apply.
                         </div>
                       </ConfirmActionForm>
+                      {selectedJob.lastBulkAction ? (
+                        <ConfirmActionForm
+                          action={undoImportJobBulkUpdate}
+                          title="Undo last batch decision"
+                          description="This restores the most recent batch row decision for this staged job."
+                          confirmLabel="Restore previous decisions"
+                          triggerLabel="Undo last batch decision"
+                          triggerVariant="ghost"
+                        >
+                          <input type="hidden" name="jobId" value={selectedJob.id} />
+                          <input type="hidden" name="returnTo" value={selectedJobHref} />
+                          <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                            Only the latest batch action can be restored, and only while this job remains staged.
+                          </div>
+                        </ConfirmActionForm>
+                      ) : null}
                     </div>
                     <details className="mt-3 rounded-[18px] border border-slate-200 bg-white">
                       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-950">
                         Batch row decisions
                       </summary>
                       <div className="grid gap-2 border-t border-slate-100 p-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <form action={updateImportJobRowsBulk}>
+                        <ConfirmActionForm
+                          action={updateImportJobRowsBulk}
+                          title="Set all matched rows to update"
+                          description="Use this when the matched rows are genuine updates to existing inventory records."
+                          confirmLabel="Set matched rows to update"
+                          triggerLabel={`Review all matched as updates (${selectedJob.matchedRows})`}
+                          triggerVariant="secondary"
+                        >
                           <input type="hidden" name="jobId" value={selectedJob.id} />
                           <input type="hidden" name="operation" value="set_matched_update" />
                           <input type="hidden" name="returnTo" value={selectedJobHref} />
-                          <SubmitButton variant="secondary" size="sm" className="w-full">
-                            Update all matched ({selectedJob.matchedRows})
-                          </SubmitButton>
-                        </form>
-                        <form action={updateImportJobRowsBulk}>
+                          <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                            {selectedJob.matchedRows} matched row(s) will be set to update their suggested item. You can undo the latest batch decision while the job stays staged.
+                          </div>
+                        </ConfirmActionForm>
+                        <ConfirmActionForm
+                          action={updateImportJobRowsBulk}
+                          title="Set unmatched rows to create"
+                          description="Use this when the unmatched rows should become new inventory records."
+                          confirmLabel="Set unmatched rows to create"
+                          triggerLabel={`Set unmatched rows to create (${selectedJob.newRows})`}
+                          triggerVariant="secondary"
+                        >
                           <input type="hidden" name="jobId" value={selectedJob.id} />
                           <input type="hidden" name="operation" value="set_unmatched_create" />
                           <input type="hidden" name="returnTo" value={selectedJobHref} />
-                          <SubmitButton variant="secondary" size="sm" className="w-full">
-                            Create all unmatched ({selectedJob.newRows})
-                          </SubmitButton>
-                        </form>
-                        <form action={updateImportJobRowsBulk}>
+                          <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                            {selectedJob.newRows} unmatched row(s) will be confirmed as new items.
+                          </div>
+                        </ConfirmActionForm>
+                        <ConfirmActionForm
+                          action={updateImportJobRowsBulk}
+                          title="Keep ready rows staged"
+                          description="Use this when the current ready rows should stay out of the apply set until later."
+                          confirmLabel="Keep ready rows staged"
+                          triggerLabel={`Keep ready rows staged (${actionableRows.length})`}
+                          triggerVariant="secondary"
+                        >
                           <input type="hidden" name="jobId" value={selectedJob.id} />
                           <input type="hidden" name="operation" value="skip_ready" />
                           <input type="hidden" name="returnTo" value={selectedJobHref} />
-                          <SubmitButton variant="secondary" size="sm" className="w-full">
-                            Skip all ready ({actionableRows.length})
-                          </SubmitButton>
-                        </form>
+                          <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                            {actionableRows.length} ready row(s) will be removed from the apply set without being deleted.
+                          </div>
+                        </ConfirmActionForm>
                       </div>
                     </details>
                   </div>
                 ) : (
-                  <Button type="button" variant="secondary" disabled>
-                    Import applied
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" disabled>
+                      Import applied
+                    </Button>
+                    <ConfirmActionForm
+                      action={stageCorrectionImportReview}
+                      title="Stage correction review"
+                      description="This creates a new staged job from the original import so you can review follow-up corrections without changing history in place."
+                      confirmLabel="Stage correction review"
+                      triggerLabel="Stage correction review"
+                      triggerVariant="secondary"
+                    >
+                      <input type="hidden" name="jobId" value={selectedJob.id} />
+                      <div className="rounded-[18px] bg-slate-50 p-3 text-sm text-slate-600">
+                        A new staged job will be created from the original source rows. This is a safe recovery path, not a rollback.
+                      </div>
+                    </ConfirmActionForm>
+                  </div>
                 )}
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-[20px] border border-rose-200 bg-rose-50/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-rose-700">Blocked</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{blockedRows.length}</p>
+                </div>
+                <div className="rounded-[20px] border border-amber-200 bg-amber-50/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-amber-700">Review first</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{reviewRows.length}</p>
+                </div>
+                <div className="rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">Ready to create</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{safeRows.length}</p>
+                </div>
+                <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Staged for later</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{skippedRows.length}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
                 <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-                  <p className="font-medium text-slate-950">Review guidance</p>
+                  <p className="font-medium text-slate-950">Next action</p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Review matched rows before apply, keep blocked rows out of the apply set, and use bulk actions when the whole batch follows the same intent.
+                    {blockedRows.length > 0
+                      ? "Fix blocked rows upstream or keep them staged. Then review matched rows before applying the ready set."
+                      : reviewRows.length > 0
+                        ? "This job can apply now, but matched rows should be reviewed so updates do not overwrite the wrong records."
+                        : actionableRows.length > 0
+                          ? "This staged job is ready. Apply when the current create set looks correct."
+                          : "Nothing is ready to apply yet. Re-queue or restage rows to continue."}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <StatusBadge value={selectedJob.status} />
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                      {actionableRows.length} ready
-                    </span>
                     <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
                       {blockedRows.length} blocked
+                    </span>
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                      {reviewRows.length} review first
+                    </span>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                      {safeRows.length} ready to create
                     </span>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                       {skippedRows.length} skipped
@@ -617,19 +622,45 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   </div>
                 </div>
                 <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="font-medium text-slate-950">Blockers</p>
+                  <p className="font-medium text-slate-950">Why rows get held back</p>
                   <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
                     {blockedRows.length > 0 ? (
                       <>
-                        <p>Blocked rows are excluded from apply until corrected upstream or re-staged.</p>
-                        <p>Common causes are duplicate fingerprints in the import batch, missing required fields, or ambiguous matches.</p>
+                        <p>Blocked rows cannot apply. They stay staged until the source data is corrected and re-imported.</p>
+                        <p>Typical causes are missing required values, duplicate rows inside the same batch, or an unsafe match decision.</p>
                       </>
                     ) : (
-                      <p>No blocked rows in this job. Everything unresolved is either ready to apply or intentionally skipped.</p>
+                      <p>No blockers in this job. The remaining work is review, apply, or keeping rows staged for later.</p>
                     )}
                   </div>
                 </div>
               </div>
+
+              {selectedJobActivity.length > 0 ? (
+                <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-slate-950">Job activity</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        Recent actions for this import job so you can see what changed and when.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {selectedJobActivity.slice(0, 6).map((event) => (
+                      <div key={event.id} className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium text-slate-950">{event.summary}</p>
+                          <StatusBadge value={event.actionType} />
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {format(event.createdAt, "MMM d, yyyy h:mm a")} · {event.actorUser?.name ?? event.actorUser?.email ?? "System"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 {rowStatusFilters.map((filter) => {
@@ -658,36 +689,44 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
 
               <div className="space-y-3 md:hidden">
                 {filteredRows.map((row) => {
-                  const guidance = rowGuidance(row);
                   return (
                   <div key={row.id} className={cn("rounded-[22px] border p-4", rowTone(row.status))}>
-                    <div className={cn("mb-3 rounded-2xl border px-3 py-2 text-sm", guidanceToneClasses(guidance.tone))}>
-                      <p className="font-medium">{guidance.label}</p>
-                      <p className="mt-1 leading-6">{guidance.detail}</p>
-                    </div>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium text-slate-950">Row {row.rowIndex}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
-                        </p>
+                        <p className="mt-1 text-sm text-slate-500">{row.review.title}</p>
                       </div>
                       <StatusBadge value={row.status} />
                     </div>
                     <div className="mt-4 space-y-3 text-sm text-slate-600">
+                      <div className={cn("rounded-2xl border px-3 py-2", reviewToneClasses(row.review.severity))}>
+                        <p className="font-medium">{row.review.title}</p>
+                        <p className="mt-1 leading-6">{row.review.detail}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Why this row is flagged</p>
+                        <div className="mt-2 space-y-1">
+                          {row.review.reasons.map((reason) => (
+                            <p key={reason}>{reason}</p>
+                          ))}
+                        </div>
+                      </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Apply as</p>
                         <div className="mt-2">
-                          {selectedJob.status === "STAGED" && row.status !== ImportRowStatus.APPLIED ? (
+                          {selectedJob.status === "STAGED" &&
+                          row.status !== ImportRowStatus.APPLIED &&
+                          row.status !== ImportRowStatus.ERROR &&
+                          row.status !== ImportRowStatus.CONFLICT ? (
                             <form action={updateImportRowResolution} className="space-y-2">
                               <input type="hidden" name="rowId" value={row.id} />
                               <input type="hidden" name="returnTo" value={selectedJobHref} />
                               <Select name="resolution" defaultValue={row.resolution}>
-                                <option value="CREATE_NEW">Create new</option>
+                                <option value="CREATE_NEW">Create as new item</option>
                                 <option value="UPDATE_MATCH" disabled={!row.suggestedMatchId}>
-                                  Update suggested match
+                                  Update matched item
                                 </option>
-                                <option value="SKIP">Skip</option>
+                                <option value="SKIP">Keep staged for later</option>
                               </Select>
                               <SubmitButton variant="secondary" size="sm" className="w-full">
                                 Save
@@ -710,12 +749,35 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       </div>
                       <details className="rounded-[18px] border border-slate-200 bg-white">
                         <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
-                          View payload
+                          Compare incoming data
                         </summary>
                         <div className="border-t border-slate-200 p-3">
-                          <pre className="overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                            {JSON.stringify(row.data, null, 2)}
-                          </pre>
+                          {row.review.currentLabel ? (
+                            <p className="mb-3 text-sm text-slate-600">Matched item: {row.review.currentLabel}</p>
+                          ) : null}
+                          {row.review.diffFields.length > 0 ? (
+                            <div className="space-y-2">
+                              {row.review.diffFields.map((field) => (
+                                <div key={field.key} className="rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-xs leading-6 text-slate-700">
+                                  <p className="font-medium text-slate-950">{field.label}</p>
+                                  <p className="mt-1">Incoming: {field.incoming || "Empty"}</p>
+                                  <p>Current: {field.current || "Empty"}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-600">No field differences detected in the review set.</p>
+                          )}
+                          <details className="mt-3 rounded-[14px] border border-slate-200 bg-white">
+                            <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-slate-950">
+                              View raw incoming data
+                            </summary>
+                            <div className="border-t border-slate-200 p-3">
+                              <pre className="overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                                {JSON.stringify(row.data, null, 2)}
+                              </pre>
+                            </div>
+                          </details>
                         </div>
                       </details>
                       <div className="flex flex-col gap-2">
@@ -750,34 +812,41 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                   <thead className="sticky top-0 z-10 bg-slate-50 text-left text-slate-500">
                     <tr>
                       <th className="px-4 py-3 font-medium whitespace-nowrap">Row</th>
-                      <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
+                      <th className="min-w-[220px] px-4 py-3 font-medium whitespace-nowrap">Review state</th>
                       <th className="min-w-[220px] px-4 py-3 font-medium whitespace-nowrap">Apply as</th>
-                      <th className="min-w-[180px] px-4 py-3 font-medium whitespace-nowrap">Suggested match</th>
-                      <th className="min-w-[220px] px-4 py-3 font-medium whitespace-nowrap">Validation</th>
-                      <th className="min-w-[360px] px-4 py-3 font-medium whitespace-nowrap">Payload</th>
-                      <th className="min-w-[160px] px-4 py-3 font-medium whitespace-nowrap">Decision</th>
+                      <th className="min-w-[280px] px-4 py-3 font-medium whitespace-nowrap">Why this row is flagged</th>
+                      <th className="min-w-[320px] px-4 py-3 font-medium whitespace-nowrap">Compare changes</th>
+                      <th className="min-w-[170px] px-4 py-3 font-medium whitespace-nowrap">Row actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {filteredRows.map((row) => {
-                      const guidance = rowGuidance(row);
                       return (
                       <tr key={row.id} className={cn("align-top", rowTone(row.status))}>
                         <td className="px-4 py-4 font-medium text-slate-950 whitespace-nowrap">{row.rowIndex}</td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <StatusBadge value={row.status} />
+                        <td className="min-w-[220px] px-4 py-4 text-slate-600">
+                          <div className={cn("rounded-2xl border px-3 py-2 text-xs leading-5", reviewToneClasses(row.review.severity))}>
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium">{row.review.title}</p>
+                              <StatusBadge value={row.status} />
+                            </div>
+                            <p className="mt-1">{row.review.detail}</p>
+                          </div>
                         </td>
                         <td className="min-w-[220px] px-4 py-4 text-slate-600">
-                          {selectedJob.status === "STAGED" && row.status !== ImportRowStatus.APPLIED ? (
+                          {selectedJob.status === "STAGED" &&
+                          row.status !== ImportRowStatus.APPLIED &&
+                          row.status !== ImportRowStatus.ERROR &&
+                          row.status !== ImportRowStatus.CONFLICT ? (
                             <form action={updateImportRowResolution} className="space-y-2">
                               <input type="hidden" name="rowId" value={row.id} />
                               <input type="hidden" name="returnTo" value={selectedJobHref} />
                               <Select name="resolution" defaultValue={row.resolution}>
-                                <option value="CREATE_NEW">Create new</option>
+                                <option value="CREATE_NEW">Create as new item</option>
                                 <option value="UPDATE_MATCH" disabled={!row.suggestedMatchId}>
-                                  Update suggested match
+                                  Update matched item
                                 </option>
-                                <option value="SKIP">Skip</option>
+                                <option value="SKIP">Keep staged for later</option>
                               </Select>
                               <SubmitButton variant="secondary" size="sm">
                                 Save
@@ -787,33 +856,54 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                             resolutionLabel(row.resolution)
                           )}
                         </td>
-                        <td className="min-w-[180px] px-4 py-4 text-slate-600">
-                          {row.resolvedMatchSlug ?? row.suggestedMatchSlug ?? "New record"}
-                        </td>
-                        <td className="min-w-[220px] px-4 py-4 text-slate-600">
-                          <div className={cn("mb-2 rounded-2xl border px-3 py-2 text-xs leading-5", guidanceToneClasses(guidance.tone))}>
-                            <p className="font-medium">{guidance.label}</p>
-                            <p className="mt-1">{guidance.detail}</p>
+                        <td className="min-w-[280px] px-4 py-4 text-slate-600">
+                          {row.review.currentLabel ? (
+                            <p className="mb-2 text-sm font-medium text-slate-950">{row.review.currentLabel}</p>
+                          ) : null}
+                          <div className="space-y-1">
+                            {row.review.reasons.map((reason) => (
+                              <p key={reason}>{reason}</p>
+                            ))}
                           </div>
                           {row.validationErrors.length > 0 ? (
-                            <div className="space-y-1">
+                            <div className="mt-2 space-y-1">
                               {row.validationErrors.map((error) => (
                                 <p key={error}>{error}</p>
                               ))}
                             </div>
-                          ) : (
-                            "No validation issues"
-                          )}
+                          ) : null}
                         </td>
-                        <td className="min-w-[360px] px-4 py-4">
+                        <td className="min-w-[320px] px-4 py-4">
                           <details className="rounded-[18px] border border-slate-200 bg-white">
                             <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
-                              View payload
+                              {row.review.diffFields.length > 0
+                                ? `Review ${row.review.diffFields.length} change${row.review.diffFields.length === 1 ? "" : "s"}`
+                                : "No differences detected"}
                             </summary>
                             <div className="border-t border-slate-200 p-3">
-                              <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                                {JSON.stringify(row.data, null, 2)}
-                              </pre>
+                              {row.review.diffFields.length > 0 ? (
+                                <div className="space-y-2">
+                                  {row.review.diffFields.map((field) => (
+                                    <div key={field.key} className="rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-xs leading-6 text-slate-700">
+                                      <p className="font-medium text-slate-950">{field.label}</p>
+                                      <p className="mt-1">Incoming: {field.incoming || "Empty"}</p>
+                                      <p>Current: {field.current || "Empty"}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-slate-600">The incoming row already matches the current record on the key review fields.</p>
+                              )}
+                              <details className="mt-3 rounded-[14px] border border-slate-200 bg-white">
+                                <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-slate-950">
+                                  View raw incoming data
+                                </summary>
+                                <div className="border-t border-slate-200 p-3">
+                                  <pre className="max-w-[480px] overflow-x-auto whitespace-pre-wrap rounded-[14px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+                                    {JSON.stringify(row.data, null, 2)}
+                                  </pre>
+                                </div>
+                              </details>
                             </div>
                           </details>
                         </td>
@@ -825,7 +915,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                                 <input type="hidden" name="decision" value="skip" />
                                 <input type="hidden" name="returnTo" value={selectedJobHref} />
                                 <SubmitButton variant="secondary" size="sm">
-                                  Skip row
+                                  Keep staged
                                 </SubmitButton>
                               </form>
                             ) : null}
@@ -835,18 +925,18 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                                 <input type="hidden" name="decision" value="retry" />
                                 <input type="hidden" name="returnTo" value={selectedJobHref} />
                                 <SubmitButton variant="secondary" size="sm">
-                                  Re-queue row
+                                  Restore to review
                                 </SubmitButton>
                               </form>
                             ) : null}
                             {row.status === ImportRowStatus.CONFLICT ? (
                               <p className="text-xs leading-5 text-slate-500">
-                                Fix the source CSV and stage a new import to resolve conflicts.
+                                Correct the source data and stage a fresh import review to resolve this blocker.
                               </p>
                             ) : null}
                             {row.status === ImportRowStatus.ERROR ? (
                               <p className="text-xs leading-5 text-slate-500">
-                                This row is blocked by validation errors and cannot be re-queued until corrected upstream.
+                                This row cannot apply until its validation issue is corrected in the source data.
                               </p>
                             ) : null}
                           </div>

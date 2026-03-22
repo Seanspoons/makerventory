@@ -40,7 +40,7 @@ import {
   updateProfileSchema,
   updateWorkspaceSchema,
 } from "@/lib/validation";
-import { deriveConsumableStatus, slugify } from "@/lib/utils";
+import { deriveConsumableStatus, formatEntityName, slugify } from "@/lib/utils";
 
 function requiredString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -96,6 +96,20 @@ function importEntityValue(formData: FormData, key = "entityType") {
 
 function booleanValue(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
+}
+
+function importEntityLabel(value: string) {
+  return formatEntityName(value).toLowerCase();
+}
+
+function stringifyImportPayload(data: Prisma.JsonValue) {
+  const payload = data as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(payload).map(([key, value]) => [
+      key,
+      value === null || value === undefined ? "" : String(value),
+    ]),
+  );
 }
 
 function selectedIds(formData: FormData, key: string) {
@@ -1587,7 +1601,7 @@ export async function stageImportJob(formData: FormData) {
     entityType,
     entityId: job.id,
     entityLabel: sourceName,
-    summary: `Staged ${job.totalRows} row(s) for ${entityType.toLowerCase().replace("_", " ")} import.`,
+    summary: `Staged ${job.totalRows} row(s) for ${importEntityLabel(entityType)} import review.`,
     metadata: {
       originalFilename: file.name,
       totalRows: job.totalRows,
@@ -1658,7 +1672,7 @@ export async function stageInventoryNotesImport(formData: FormData) {
       entityType: group.entityType,
       entityId: job.id,
       entityLabel: job.sourceName,
-      summary: `Staged ${job.totalRows} row(s) from pasted notes for ${group.entityType.toLowerCase().replaceAll("_", " ")}.`,
+      summary: `Staged ${job.totalRows} row(s) from pasted notes for ${importEntityLabel(group.entityType)} review.`,
       metadata: {
         source: "notes-paste",
         sectionLabel: group.sectionLabel,
@@ -1695,7 +1709,7 @@ export async function applyStagedImport(formData: FormData) {
     entityType: job.entityType,
     entityId: job.id,
     entityLabel: job.sourceName,
-    summary: `Applied staged ${job.entityType.toLowerCase().replace("_", " ")} import.`,
+    summary: `Applied staged ${importEntityLabel(job.entityType)} import.`,
     metadata: {
       appliedAt: job.appliedAt?.toISOString() ?? null,
     },
@@ -1704,7 +1718,7 @@ export async function applyStagedImport(formData: FormData) {
   await setFlashMessage({
     type: "success",
     title: "Import applied",
-    message: `${job.entityType.toLowerCase().replace("_", " ")} records were written to inventory.`,
+    message: `${formatEntityName(job.entityType)} records were written to inventory.`,
   });
   logInfo("imports.apply_succeeded", {
     ...logContext,
@@ -1842,12 +1856,13 @@ export async function updateImportRowDecision(formData: FormData) {
     workspaceId,
     userId,
     actionType: "UPDATE",
-    entityType: "import-row",
-    entityId: rowId,
+    entityType: "import-job",
+    entityId: row.importJobId,
     entityLabel: row.importJob.sourceName,
     summary: decision === "skip" ? "Skipped staged import row." : "Re-queued staged import row.",
     metadata: {
       importJobId: row.importJobId,
+      rowId,
       rowIndex: row.rowIndex,
       nextStatus,
       nextResolution,
@@ -1933,12 +1948,13 @@ export async function updateImportRowResolution(formData: FormData) {
     workspaceId,
     userId,
     actionType: "UPDATE",
-    entityType: "import-row",
-    entityId: rowId,
+    entityType: "import-job",
+    entityId: row.importJobId,
     entityLabel: row.importJob.sourceName,
-    summary: `Changed staged row resolution to ${resolution.toLowerCase().replace("_", " ")}.`,
+    summary: `Changed row ${row.rowIndex} to ${resolution.toLowerCase().replace("_", " ")}.`,
     metadata: {
       importJobId: row.importJobId,
+      rowId,
       rowIndex: row.rowIndex,
       resolution,
       nextStatus,
@@ -2019,6 +2035,14 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     return;
   }
 
+  const previousRows = rowsToUpdate.map((row) => ({
+    id: row.id,
+    status: row.status,
+    resolution: row.resolution,
+    resolvedMatchId: row.resolvedMatchId,
+    resolvedMatchSlug: row.resolvedMatchSlug,
+  }));
+
   await prisma.$transaction(
     rowsToUpdate.map((row) => {
       if (operation === "set_matched_update") {
@@ -2064,7 +2088,15 @@ export async function updateImportJobRowsBulk(formData: FormData) {
 
   await prisma.importJob.update({
     where: { id: jobId },
-    data: summarizeImportRows(refreshedRows),
+    data: {
+      ...summarizeImportRows(refreshedRows),
+      lastBulkAction: {
+        operation,
+        updatedRows: rowsToUpdate.length,
+        createdAt: new Date().toISOString(),
+        rows: previousRows,
+      },
+    },
   });
 
   const title =
@@ -2091,6 +2123,7 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     metadata: {
       operation,
       updatedRows: rowsToUpdate.length,
+      previousRows,
     },
   });
 
@@ -2103,4 +2136,158 @@ export async function updateImportJobRowsBulk(formData: FormData) {
   if (returnTo) {
     redirect(returnTo as Parameters<typeof redirect>[0]);
   }
+}
+
+export async function undoImportJobBulkUpdate(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const jobId = requiredString(formData, "jobId");
+  const returnTo = optionalString(formData, "returnTo");
+
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, workspaceId },
+    select: {
+      id: true,
+      status: true,
+      sourceName: true,
+      lastBulkAction: true,
+    },
+  });
+
+  if (!job) {
+    throw new Error("Import job not found.");
+  }
+
+  if (job.status !== "STAGED") {
+    throw new Error("Only staged import jobs can undo batch decisions.");
+  }
+
+  const snapshot = job.lastBulkAction as
+    | {
+        rows?: Array<{
+          id: string;
+          status: "NEW" | "MATCHED" | "SKIPPED" | "ERROR" | "CONFLICT" | "APPLIED";
+          resolution: "CREATE_NEW" | "UPDATE_MATCH" | "SKIP";
+          resolvedMatchId: string | null;
+          resolvedMatchSlug: string | null;
+        }>;
+      }
+    | null;
+
+  if (!snapshot?.rows?.length) {
+    await setFlashMessage({
+      type: "error",
+      title: "Nothing to undo",
+      message: "There is no saved batch decision to restore for this job.",
+    });
+    revalidatePath("/imports");
+    if (returnTo) {
+      redirect(returnTo as Parameters<typeof redirect>[0]);
+    }
+    return;
+  }
+
+  await prisma.$transaction(
+    snapshot.rows.map((row) =>
+      prisma.importRow.update({
+        where: { id: row.id },
+        data: {
+          status: row.status,
+          resolution: row.resolution,
+          resolvedMatchId: row.resolvedMatchId,
+          resolvedMatchSlug: row.resolvedMatchSlug,
+        },
+      }),
+    ),
+  );
+
+  const refreshedRows = await prisma.importRow.findMany({
+    where: { importJobId: jobId },
+    select: { status: true },
+  });
+
+  await prisma.importJob.update({
+    where: { id: jobId },
+    data: {
+      ...summarizeImportRows(refreshedRows),
+      lastBulkAction: Prisma.DbNull,
+    },
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "UPDATE",
+    entityType: "import-job",
+    entityId: job.id,
+    entityLabel: job.sourceName,
+    summary: "Undid the most recent batch row decision.",
+    metadata: {
+      importJobId: job.id,
+      restoredRows: snapshot.rows.length,
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Batch decision restored",
+    message: `${snapshot.rows.length} row(s) were restored to their previous review state.`,
+  });
+  revalidatePath("/imports");
+  if (returnTo) {
+    redirect(returnTo as Parameters<typeof redirect>[0]);
+  }
+}
+
+export async function stageCorrectionImportReview(formData: FormData) {
+  const { userId, workspaceId } = await getWorkspaceContext();
+  const logContext = await getRequestLogContext({ userId, workspaceId });
+  const jobId = requiredString(formData, "jobId");
+
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, workspaceId },
+    include: { rows: { orderBy: { rowIndex: "asc" } } },
+  });
+
+  if (!job) {
+    throw new Error("Import job not found.");
+  }
+
+  const records = job.rows.map((row) => stringifyImportPayload(row.data));
+  const rows = await stageImportRecords(workspaceId, job.entityType, records);
+  const correctionJob = await createImportJobWithRows({
+    workspaceId,
+    userId,
+    entityType: job.entityType,
+    sourceName: `${job.sourceName} · Correction review`,
+    originalFilename: job.originalFilename,
+    notes: `Restaged from import job ${job.sourceName} for follow-up review.`,
+    rows,
+  });
+
+  await logAuditEvent({
+    workspaceId,
+    userId,
+    actionType: "IMPORT_STAGE",
+    entityType: job.entityType,
+    entityId: correctionJob.id,
+    entityLabel: correctionJob.sourceName,
+    summary: "Staged a correction review from an existing import job.",
+    metadata: {
+      sourceImportJobId: job.id,
+      totalRows: correctionJob.totalRows,
+    },
+  });
+
+  await setFlashMessage({
+    type: "success",
+    title: "Correction review staged",
+    message: "A new staged job was created so you can safely review follow-up changes.",
+  });
+  logInfo("imports.correction_stage_succeeded", {
+    ...logContext,
+    sourceImportJobId: job.id,
+    correctionImportJobId: correctionJob.id,
+  });
+  revalidatePath("/imports");
+  redirect(`/imports?selected=${correctionJob.id}#staged-job`);
 }

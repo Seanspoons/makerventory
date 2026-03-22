@@ -1,4 +1,5 @@
 import {
+  ImportEntityType,
   Prisma,
   StockStatus,
   WishlistPriority,
@@ -6,6 +7,7 @@ import {
 } from "@prisma/client";
 import { subDays } from "date-fns";
 import { requireSession } from "@/lib/auth";
+import { buildImportRowReview } from "@/lib/import-review";
 import { prisma } from "@/lib/prisma";
 import { deriveConsumableStatus } from "@/lib/utils";
 
@@ -425,10 +427,248 @@ export async function getImportJobs(selectedId?: string | null) {
       })
     : null;
 
+  const rowMatchIds = selectedJob
+    ? Array.from(
+        new Set(
+          selectedJob.rows
+            .map((row) => row.resolvedMatchId ?? row.suggestedMatchId)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      )
+    : [];
+
+  const matchedRecords = selectedJob
+    ? await fetchImportComparisonRecords(selectedJob.entityType, workspaceId, rowMatchIds)
+    : new Map<string, Record<string, unknown>>();
+
+  const selectedJobActivity = selectedJob
+    ? await prisma.auditEvent.findMany({
+        where: {
+          workspaceId,
+          OR: [
+            { entityId: selectedJob.id },
+            { metadata: { path: ["importJobId"], equals: selectedJob.id } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 12,
+        include: {
+          actorUser: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+    : [];
+
   return {
     jobs,
-    selectedJob,
+    selectedJob: selectedJob
+      ? {
+          ...selectedJob,
+          rows: selectedJob.rows.map((row) => {
+            const currentRecord =
+              matchedRecords.get(row.resolvedMatchId ?? row.suggestedMatchId ?? "") ?? null;
+
+            return {
+              ...row,
+              review: buildImportRowReview({
+                entityType: selectedJob.entityType,
+                status: row.status,
+                resolution: row.resolution,
+                suggestedMatchSlug: row.suggestedMatchSlug,
+                validationErrors: row.validationErrors,
+                data: row.data as Record<string, unknown>,
+                currentRecord,
+              }),
+              comparisonRecord: currentRecord,
+            };
+          }),
+        }
+      : null,
+    selectedJobActivity,
   };
+}
+
+async function fetchImportComparisonRecords(
+  entityType: ImportEntityType,
+  workspaceId: string,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return new Map<string, Record<string, unknown>>();
+  }
+
+  switch (entityType) {
+    case "PRINTER": {
+      const records = await prisma.printer.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          brand: true,
+          model: true,
+          buildVolumeX: true,
+          buildVolumeY: true,
+          buildVolumeZ: true,
+          location: true,
+          status: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "MATERIAL_SYSTEM": {
+      const records = await prisma.materialSystem.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          status: true,
+          supportedMaterialsNotes: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "BUILD_PLATE": {
+      const records = await prisma.buildPlate.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          sizeMm: true,
+          surfaceType: true,
+          status: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "HOTEND": {
+      const records = await prisma.hotend.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          nozzleSize: true,
+          materialType: true,
+          quantity: true,
+          status: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "FILAMENT": {
+      const records = await prisma.filamentSpool.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          brand: true,
+          materialType: true,
+          color: true,
+          quantity: true,
+          estimatedRemainingGrams: true,
+          abrasive: true,
+          dryingRequired: true,
+          hygroscopicLevel: true,
+          storageLocation: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "CONSUMABLE": {
+      const records = await prisma.consumableItem.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          quantity: true,
+          unit: true,
+          reorderThreshold: true,
+          storageLocation: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "SAFETY": {
+      const records = await prisma.safetyEquipment.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          status: true,
+          replacementSchedule: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "SMART_PLUG": {
+      const records = await prisma.smartPlug.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          assignedDeviceLabel: true,
+          status: true,
+          powerMonitoringCapable: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "TOOL_PART": {
+      const records = await prisma.toolPart.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          quantity: true,
+          storageLocation: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    case "WISHLIST": {
+      const records = await prisma.wishlistItem.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          priority: true,
+          estimatedCost: true,
+          vendor: true,
+          purchaseUrl: true,
+          status: true,
+          notes: true,
+        },
+      });
+      return new Map(records.map((record) => [record.id, normalizeComparisonRecord(record)]));
+    }
+    default:
+      return new Map<string, Record<string, unknown>>();
+  }
+}
+
+function normalizeComparisonRecord(record: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      value && typeof value === "object" && "toString" in value ? String(value) : value,
+    ]),
+  );
 }
 
 export const wishlistPriorityOrder: WishlistPriority[] = [
