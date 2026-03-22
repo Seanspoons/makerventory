@@ -49,9 +49,9 @@ export default async function AuditPage() {
                   <td className="px-4 py-4 text-slate-600">
                     <p>{event.summary}</p>
                     {event.metadata ? (
-                      <pre className="mt-3 max-w-[420px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-                        {JSON.stringify(event.metadata, null, 2)}
-                      </pre>
+                      <div className="mt-3">
+                        <AuditMetadataSummary metadata={event.metadata} />
+                      </div>
                     ) : null}
                   </td>
                   <td className="px-4 py-4 text-slate-600">
@@ -63,6 +63,49 @@ export default async function AuditPage() {
           </table>
         </div>
       </SectionCard>
+    </div>
+  );
+}
+
+function AuditMetadataSummary({ metadata }: { metadata: unknown }) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return (
+      <pre className="max-w-[420px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+        {JSON.stringify(metadata, null, 2)}
+      </pre>
+    );
+  }
+
+  const record = metadata as Record<string, unknown>;
+  const rowsChanged =
+    typeof record.updatedRows === "number"
+      ? `${record.updatedRows} rows changed`
+      : typeof record.restoredRows === "number"
+        ? `${record.restoredRows} rows restored`
+        : typeof record.totalRows === "number"
+          ? `${record.totalRows} rows in job`
+          : null;
+
+  const sourceImport =
+    typeof record.sourceImportJobId === "string" ? "Created from an earlier import job." : null;
+  const mappingNote = record.previousRows ? "Previous row decisions were captured for recovery." : null;
+  const notes = [rowsChanged, sourceImport, mappingNote].filter(Boolean);
+
+  if (notes.length === 0) {
+    return (
+      <pre className="max-w-[420px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
+        {JSON.stringify(metadata, null, 2)}
+      </pre>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {notes.map((note) => (
+        <div key={note} className="rounded-[14px] border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-700">
+          {note}
+        </div>
+      ))}
     </div>
   );
 }

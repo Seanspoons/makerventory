@@ -76,6 +76,24 @@ function reviewToneClasses(severity: "blocker" | "warning" | "info" | "safe") {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function rowFilterCount(
+  filter: (typeof rowStatusFilters)[number]["value"],
+  rows: Array<{ status: ImportRowStatus }>,
+) {
+  if (filter === "all") return rows.length;
+  if (filter === "ready") {
+    return rows.filter((row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED).length;
+  }
+  if (filter === "matched") return rows.filter((row) => row.status === ImportRowStatus.MATCHED).length;
+  if (filter === "new") return rows.filter((row) => row.status === ImportRowStatus.NEW).length;
+  if (filter === "blocked") {
+    return rows.filter((row) => row.status === ImportRowStatus.CONFLICT || row.status === ImportRowStatus.ERROR).length;
+  }
+  if (filter === "skipped") return rows.filter((row) => row.status === ImportRowStatus.SKIPPED).length;
+  if (filter === "applied") return rows.filter((row) => row.status === ImportRowStatus.APPLIED).length;
+  return rows.length;
+}
+
 export default async function ImportsPage(props: { searchParams?: SearchParams }) {
   const searchParams = (await props.searchParams) ?? {};
   const selected =
@@ -372,7 +390,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                 <ConfirmActionForm
                   action={applyAllStagedImports}
                   title="Apply all staged imports"
-                  description="This applies every staged import job in the current workspace. Blocked rows will remain staged and unapplied."
+                  description="This applies every staged job in the current workspace. Blocked rows stay staged, and matched updates should already be reviewed before you continue."
                   confirmLabel="Apply all staged jobs"
                   triggerLabel="Apply all staged jobs"
                   triggerVariant="secondary"
@@ -677,7 +695,9 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       variant={isActive ? "default" : "secondary"}
                       className={cn("w-full sm:w-auto", isActive ? "!text-white [&_svg]:!text-white" : "")}
                     >
-                      <Link href={href as Parameters<typeof Link>[0]["href"]}>{filter.label}</Link>
+                      <Link href={href as Parameters<typeof Link>[0]["href"]}>
+                        {filter.label} ({rowFilterCount(filter.value, selectedJob.rows)})
+                      </Link>
                     </Button>
                   );
                 })}
@@ -686,6 +706,12 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
                 Showing {filteredRows.length} of {selectedJob.rows.length} row(s) in this staged job.
               </div>
+
+              {filteredRows.length === 0 ? (
+                <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/60 p-5 text-sm text-slate-500">
+                  No rows are in this review bucket right now. Choose another filter to continue reviewing the staged job.
+                </div>
+              ) : null}
 
               <div className="space-y-3 md:hidden">
                 {filteredRows.map((row) => {
