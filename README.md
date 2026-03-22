@@ -1,37 +1,28 @@
 # Makerventory
 
-Makerventory is a production-style 3D printing inventory and operations manager for serious hobbyists, maker labs, and small print shops. It centralizes printers, AMS units, dryers, plates, hotends, filament, consumables, safety equipment, smart plugs, workshop parts, wishlist planning, and maintenance history in a single operational UI.
+Makerventory is a production-oriented 3D printing inventory and operations manager for serious hobbyists, maker labs, and small print shops. It tracks printers, hardware assignments, filament, consumables, maintenance, imports, and purchase planning in one operational workspace.
 
 ## Stack
 
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
-- shadcn-style UI primitives
 - Prisma
 - PostgreSQL
+- NextAuth credentials auth
+- Resend for auth email delivery
 
-## Project Overview
+## Product Overview
 
-Makerventory is designed as an internal-tool style SaaS dashboard rather than a toy CRUD demo. The application emphasizes:
+Makerventory is designed as an internal-tool style product rather than a generic dashboard template. The app now includes:
 
-- operational workshop visibility
-- user-owned workspaces and self-serve onboarding
-- compatibility-aware hardware modeling
-- maintenance and inventory workflows
-- future extensibility for telemetry, QR labels, power automation, and usage analytics
+- workspace-owned inventory and operations data
+- assignment-driven printer, plate, hotend, smart plug, and material-system behavior
+- staged CSV and Notes imports with review and recovery paths
+- onboarding, calmer inventory UX, and operational dashboarding
+- regression tests for core inventory and import rules
 
-## Features
-
-- Dashboard with workshop health, low stock, maintenance activity, smart plug state, safety visibility, and compatibility callouts
-- Dedicated inventory pages for printers, material systems, build plates, hotends, filament, consumables, safety equipment, smart plugs, tools/parts, wishlist, and maintenance logs
-- Detailed printer pages with installed hardware, linked systems, compatibility coverage, and maintenance history
-- Filament workflow with filters for material, brand, abrasive handling, hygroscopic risk, and stock state
-- Server actions for quick-add flows, maintenance logging, filament state updates, and archive/retire workflows
-- Self-serve signup flow with workspace creation
-- Account settings for profile, workspace, and password management
-
-## Local Setup
+## Local Development
 
 1. Install dependencies:
 
@@ -39,67 +30,61 @@ Makerventory is designed as an internal-tool style SaaS dashboard rather than a 
 npm install
 ```
 
-2. Copy the environment file and set a real auth secret:
+2. Copy the example environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Apply the Prisma migrations to your database:
+3. Fill in at least:
+
+- `DATABASE_URL`
+- `NEXTAUTH_URL`
+- `AUTH_SECRET`
+
+4. Apply local migrations:
 
 ```bash
 npm run db:migrate
 ```
 
-4. Start the development server:
+5. Start the dev server:
 
 ```bash
 npm run dev
 ```
 
-5. Open `http://localhost:3000`, create an account, and enter your own inventory data.
+6. Open `http://localhost:3000`, create an account, and onboard your own inventory.
 
-6. Run the focused regression suite when changing core workflow logic:
+### Local Password Reset Behavior
 
-```bash
-npm test
+For local-only testing, you can enable direct reset-link flashes instead of real email delivery:
+
+```env
+ALLOW_INSECURE_DEV_RESET_LINKS="true"
 ```
 
-Password reset in local development:
+Keep that disabled in any shared, preview, or production environment.
 
-- set `ALLOW_INSECURE_DEV_RESET_LINKS=true` only in local/dev environments if you want Makerventory to surface a reset link directly in the UI flash message
-- keep that value `false` in any shared or production environment
+## Docker Development
 
-## Docker Quick Start
-
-1. Start the full local stack:
+Start the local Docker stack:
 
 ```bash
 docker compose up --build
 ```
 
-2. Open `http://localhost:3001`.
+Open `http://localhost:3001`.
 
-What happens on startup:
+What Docker does on startup:
 
-- the app ensures container dependencies match `package-lock.json`
-- PostgreSQL starts in a dedicated container
-- the app waits for the database to become reachable
-- Prisma Client is generated
-- committed migrations are applied
-- if Docker detects an older local dev volume created before migration history existed, it resets the local schema once and reapplies migrations
-- no inventory seed is applied automatically
-- local Docker enables insecure password reset links for testing unless you remove `ALLOW_INSECURE_DEV_RESET_LINKS=true`
-- Next.js starts in development mode with file watching enabled
+- starts PostgreSQL in a dedicated container
+- generates Prisma Client
+- applies committed migrations
+- resets an older pre-migration local dev schema only when `PRISMA_DEV_RESET_ON_P3005=true`
+- runs Next.js in dev mode with live reload
 
-Live reload behavior:
-
-- leave `docker compose up` running
-- edit files locally in this repo
-- the app container sees the bind-mounted changes immediately
-- Next.js dev mode reloads the browser as you work
-
-Useful Docker commands:
+Useful commands:
 
 ```bash
 docker compose up --build
@@ -107,124 +92,292 @@ docker compose down
 docker compose down -v
 ```
 
-- Use `docker compose down -v` only if you want to remove the PostgreSQL volume and force a fresh reseed on next startup.
-- The automatic local schema reset is Docker-dev-only and is enabled by `PRISMA_DEV_RESET_ON_P3005=true` in `docker-compose.yml`.
-- PostgreSQL is only exposed inside the Docker network. The app container connects internally on `db:5432`, and no host DB port is published.
+Use `docker compose down -v` only when you intentionally want to discard the local Docker database volume.
 
-## Operations
+## Required Services For Hosted Deployment
 
-- Health endpoint:
+Recommended hosted stack:
 
-```bash
-curl http://localhost:3001/api/health
+- Vercel
+- Neon Postgres
+- Resend
+
+Alternative stack:
+
+- Railway for app + Postgres
+- Resend for auth email delivery
+
+You do not need any additional services to reach the first hosted milestone.
+
+## Environment Variables
+
+Makerventory expects the following server-side environment variables:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string used by Prisma |
+| `NEXTAUTH_URL` | Yes in hosted setups | Canonical public app URL used for auth callbacks and password reset links |
+| `AUTH_SECRET` | Yes | Shared auth/session secret used by NextAuth and middleware |
+| `RESEND_API_KEY` | Yes for hosted password reset | API key for Resend transactional email |
+| `EMAIL_FROM` | Yes when using Resend | Verified sender identity for Makerventory auth email |
+| `EMAIL_REPLY_TO` | Optional | Reply-to address for auth email |
+| `ALLOW_INSECURE_DEV_RESET_LINKS` | Local dev only | Allows direct reset-link flash messages instead of email delivery |
+
+Notes:
+
+- `AUTH_SECRET` is the canonical secret name going forward.
+- `NEXTAUTH_SECRET` is still supported as a fallback for compatibility, but new setups should use `AUTH_SECRET`.
+- Hosted environments should always set `NEXTAUTH_URL` explicitly even if the platform provides a deployment URL.
+
+## Transactional Email Setup
+
+Makerventory now sends password reset email through a small provider abstraction backed by Resend.
+
+### Resend Setup
+
+1. Create a Resend account.
+2. Verify a sending domain or single sender identity.
+3. Set:
+
+```env
+RESEND_API_KEY="re_..."
+EMAIL_FROM="Makerventory <noreply@yourdomain.com>"
+EMAIL_REPLY_TO="support@yourdomain.com"
 ```
 
-- Protected requests receive an `x-request-id` header so logs can be correlated back to a specific request during troubleshooting.
-- Auth and import workflows emit structured JSON logs for production-friendly ingestion.
+Behavior by environment:
 
-### Backup Guidance
+- local dev without `RESEND_API_KEY`: password reset can use the insecure direct-link fallback only if `ALLOW_INSECURE_DEV_RESET_LINKS=true`
+- hosted preview/production without `RESEND_API_KEY`: password reset fails with a clear operator-facing configuration message instead of silently pretending email was delivered
 
-Create a logical PostgreSQL backup from the Docker database container:
+## Prisma And Database Workflow
 
-```bash
-mkdir -p backups
-docker compose exec -T db pg_dump -U postgres -d makerventory --clean --if-exists > backups/makerventory-$(date +%F-%H%M%S).sql
-```
+### Development
 
-### Restore Validation
-
-Validate a backup by restoring it into a temporary database inside the Postgres container:
-
-```bash
-docker compose exec -T db createdb -U postgres makerventory_restore_check
-docker compose exec -T db psql -U postgres -d makerventory_restore_check < backups/<backup-file>.sql
-docker compose exec -T db psql -U postgres -d makerventory_restore_check -c "SELECT COUNT(*) FROM \"Workspace\";"
-docker compose exec -T db dropdb -U postgres makerventory_restore_check
-```
-
-- Run restore validation regularly, not only after incidents.
-- Keep backup files outside the repo and store them securely.
-- Treat backup artifacts as sensitive because they can contain user, workspace, and inventory data.
-
-## Prisma Workflow
-
-- Generate Prisma Client:
-
-```bash
-npm run db:generate
-```
-
-- Apply committed migrations:
-
-```bash
-npm run db:deploy
-```
-
-- Push schema changes during development if you are intentionally doing non-migration prototyping:
-
-```bash
-npm run db:push
-```
-
-- Create a migration if you want a migration history:
+Create migrations locally:
 
 ```bash
 npm run db:migrate
 ```
 
-- Seed the database:
+### Hosted Deployments
+
+Apply committed migrations:
 
 ```bash
-npm run db:seed
+npm run db:deploy
 ```
 
-## Data Onboarding
+Hosted environments should use `db:deploy`, not `db:migrate`.
 
-- The app no longer injects demo inventory into local or Docker environments.
-- Each user creates their own account and workspace through the signup flow.
-- Inventory, maintenance history, imports, and wishlist data are expected to come from the user rather than bundled seed records.
+## CI
 
-## Screenshots
+GitHub Actions is configured to run:
 
-- Dashboard: `TODO`
-- Printer detail: `TODO`
-- Filament inventory: `TODO`
-- Wishlist planning: `TODO`
+- `npm test`
+- `npm run build`
+
+Workflow file:
+
+- [ci.yml](/Users/seanwotherspoon/GitHub/makerventory/.github/workflows/ci.yml)
+
+CI uses placeholder build-time env values for auth and database configuration because the current regression suite does not require a live database.
+
+## Deployment Paths
+
+### Option A: Vercel + Neon + Resend
+
+Recommended for the first hosted deployment.
+
+1. Create a Neon Postgres database.
+2. Create a Resend sender identity.
+3. Create a Vercel project from this repo.
+4. Configure these Vercel environment variables:
+
+```env
+DATABASE_URL="..."
+NEXTAUTH_URL="https://your-app.vercel.app"
+AUTH_SECRET="..."
+RESEND_API_KEY="..."
+EMAIL_FROM="Makerventory <noreply@yourdomain.com>"
+EMAIL_REPLY_TO="support@yourdomain.com"
+```
+
+5. Run Prisma migrations against the hosted database:
+
+```bash
+npm run db:deploy
+```
+
+6. Trigger a fresh deployment.
+
+Vercel notes:
+
+- set `NEXTAUTH_URL` explicitly for production and preview if you want predictable password reset links
+- use the Neon pooled connection string if recommended by your Neon project settings
+- keep `AUTH_SECRET` stable across deployments
+
+### Option B: Railway
+
+Railway is viable if you want app hosting and database hosting in one place.
+
+1. Create a Railway project.
+2. Add a PostgreSQL service.
+3. Add the Makerventory app service from this repo.
+4. Configure:
+
+```env
+DATABASE_URL="..."
+NEXTAUTH_URL="https://your-railway-domain"
+AUTH_SECRET="..."
+RESEND_API_KEY="..."
+EMAIL_FROM="Makerventory <noreply@yourdomain.com>"
+EMAIL_REPLY_TO="support@yourdomain.com"
+```
+
+5. Ensure your start/deploy workflow applies:
+
+```bash
+npm run db:deploy
+```
+
+Railway notes:
+
+- confirm the public domain before enabling password reset
+- ensure migrations run before or during the deploy step
+- Railway Postgres backups depend on the plan and project setup, so confirm retention in the Railway dashboard
+
+## Preview Deployment Flow
+
+For a preview environment:
+
+1. Provision a preview-safe database.
+2. Set preview env vars, including a preview `NEXTAUTH_URL`.
+3. Apply migrations.
+4. Validate:
+
+```bash
+npm test
+npm run build
+curl https://your-preview-host/api/health
+```
+
+5. Confirm:
+
+- sign-up works
+- sign-in works
+- password reset sends email
+- imports can stage and review safely
+
+## Production Deployment Flow
+
+1. Merge only after CI passes.
+2. Ensure production env vars are set.
+3. Apply committed migrations with `npm run db:deploy`.
+4. Deploy the app.
+5. Run a post-deploy check:
+
+- `GET /api/health`
+- sign in with a real account
+- request a password reset email
+- confirm imports and dashboard render normally
+
+## Recovery, Rollback, And Backups
+
+### App Rollback
+
+Application rollback is host-managed:
+
+- Vercel: redeploy the last known-good deployment
+- Railway: redeploy the previous release if available
+
+### Database Rollback
+
+Do not treat Prisma migrations as instant rollback.
+
+The safe recovery path is:
+
+1. restore from a known-good database backup
+2. re-run `npm run db:deploy` only if the restored database is behind the expected migration level
+
+### Backup Guidance
+
+Neon:
+
+- enable built-in backups/branching and confirm retention settings
+- use protected branches or production branches for schema changes
+
+Railway:
+
+- confirm automatic backup availability and retention on your plan
+- export logical backups regularly for independent recovery
+
+### Restore Validation
+
+At minimum, validate restore readiness by restoring into a temporary database and checking core tables:
+
+- `Workspace`
+- `User`
+- `Printer`
+- `ImportJob`
+- `AuditEvent`
+
+Do not assume backups are valid until you have performed a restore test.
+
+## Operational Readiness
+
+Makerventory already includes:
+
+- structured JSON logging
+- request correlation via `x-request-id`
+- `/api/health` database-backed health checks
+
+Recommended operator setup:
+
+- use host log streaming or retention features
+- connect runtime logs to a log sink such as Better Stack, Logtail, or the host’s built-in logging
+- add an error monitoring service such as Sentry before public rollout if you want stack traces and release correlation
+
+Current health endpoint:
+
+```bash
+curl https://your-host/api/health
+```
+
+## Data Strategy
+
+- no demo inventory is injected in normal local or hosted flows
+- each user creates their own account and workspace
+- real inventory should enter through onboarding, manual entry, or staged imports
+
+## Seed Strategy
+
+The legacy demo-heavy seed path is no longer part of the expected operator workflow.
+
+Use `npm run db:seed` only if you intentionally create a separate demo or QA environment around it.
+
+## Test And Verification Commands
+
+```bash
+npm test
+npm run build
+npm run db:deploy
+```
+
+## Remaining Limits Before Public Rollout
+
+- no browser-level end-to-end deployment smoke tests yet
+- no database-backed integration suite for server actions yet
+- no full external error-monitoring integration yet
+- no multi-user workspace management yet
 
 ## Future Roadmap
 
 - Add QR code labels for bins, spools, and printer components
 - Track spool consumption and remaining grams from print history
-- Log print history and print outcomes per machine
+- Log print history and outcomes per machine
 - Integrate printer telemetry and job state polling
 - Automate smart plug control and shutdown policies
 - Surface recurring maintenance reminders
 - Add filament drying schedules and desiccant refresh alerts
 - Build analytics around material usage, waste, and cost
-
-## Verification
-
-Production build verified with:
-
-```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/makerventory" npm run build
-```
-
-Docker stack can be validated with:
-
-```bash
-docker compose config
-```
-
-Focused regression coverage can be run with:
-
-```bash
-npm test
-```
-
-## Notes
-
-- The app uses a PostgreSQL datasource in Prisma as requested.
-- Pages are rendered dynamically so the dashboard and inventory views can read live operational data.
-- The UI is optimized primarily for desktop but remains responsive on smaller screens.
-- Authentication uses a self-serve signup flow instead of a bootstrap owner account.
