@@ -304,35 +304,59 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                             <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                               <input type="hidden" name="kind" value="filament" />
                               <input type="hidden" name="id" value={item.id} />
-                              <Input name="brand" defaultValue={item.brand} required />
-                              <Input name="materialType" defaultValue={item.materialType} required />
-                              <Input name="subtype" defaultValue={item.subtype ?? ""} />
-                              <Input name="finish" defaultValue={item.finish ?? ""} />
-                              <Input name="color" defaultValue={item.color} required />
-                              <Input name="quantity" type="number" defaultValue={item.quantity} required />
-                              <Input
-                                name="estimatedRemainingGrams"
-                                type="number"
-                                defaultValue={item.estimatedRemainingGrams ?? 1000}
-                              />
-                              <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
-                              <Select name="status" defaultValue={item.status}>
-                                <option value="HEALTHY">Healthy</option>
-                                <option value="LOW">Low</option>
-                                <option value="OUT">Out</option>
-                                <option value="ARCHIVED">Archived</option>
-                              </Select>
-                              <Select name="hygroscopicLevel" defaultValue={item.hygroscopicLevel ?? ""}>
-                                <option value="">Unspecified</option>
-                                <option value="LOW">Low</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="HIGH">High</option>
-                              </Select>
-                              <Input
-                                name="recommendedNozzle"
-                                defaultValue={item.filamentRecommendation?.recommendedNozzle ?? ""}
-                              />
-                              <div className="flex flex-wrap gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                              <LabeledField label="Brand">
+                                <Input name="brand" defaultValue={item.brand} required />
+                              </LabeledField>
+                              <LabeledField label="Material type">
+                                <Input name="materialType" defaultValue={item.materialType} required />
+                              </LabeledField>
+                              <LabeledField label="Subtype">
+                                <Input name="subtype" defaultValue={item.subtype ?? ""} />
+                              </LabeledField>
+                              <LabeledField label="Finish">
+                                <Input name="finish" defaultValue={item.finish ?? ""} />
+                              </LabeledField>
+                              <LabeledField label="Color">
+                                <Input name="color" defaultValue={item.color} required />
+                              </LabeledField>
+                              <LabeledField label="Quantity">
+                                <Input name="quantity" type="number" defaultValue={item.quantity} required />
+                              </LabeledField>
+                              <LabeledField label="Estimated remaining grams">
+                                <Input
+                                  name="estimatedRemainingGrams"
+                                  type="number"
+                                  defaultValue={item.estimatedRemainingGrams ?? 1000}
+                                />
+                              </LabeledField>
+                              <LabeledField label="Storage location">
+                                <Input name="storageLocation" defaultValue={item.storageLocation ?? ""} />
+                              </LabeledField>
+                              <LabeledField label="Stock state">
+                                <Select name="status" defaultValue={item.status}>
+                                  <option value="HEALTHY">Healthy</option>
+                                  <option value="LOW">Low</option>
+                                  <option value="OUT">Out</option>
+                                  <option value="ARCHIVED">Archived</option>
+                                </Select>
+                              </LabeledField>
+                              <LabeledField label="Hygroscopic level">
+                                <Select name="hygroscopicLevel" defaultValue={item.hygroscopicLevel ?? ""}>
+                                  <option value="">Unspecified</option>
+                                  <option value="LOW">Low</option>
+                                  <option value="MEDIUM">Medium</option>
+                                  <option value="HIGH">High</option>
+                                </Select>
+                              </LabeledField>
+                              <LabeledField label="Recommended nozzle">
+                                <Input
+                                  name="recommendedNozzle"
+                                  defaultValue={item.filamentRecommendation?.recommendedNozzle ?? ""}
+                                />
+                              </LabeledField>
+                              <fieldset className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+                                <legend className="px-1 text-sm font-medium text-slate-700">Handling and stock flags</legend>
+                                <div className="mt-2 flex flex-wrap gap-4">
                                 <label className="flex items-center gap-2 text-sm text-slate-700">
                                   <input type="checkbox" name="opened" defaultChecked={item.opened} />
                                   Opened
@@ -365,13 +389,17 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                                   />
                                   Hardened nozzle needed
                                 </label>
-                              </div>
-                              <Textarea name="notes" defaultValue={item.notes ?? ""} className="lg:col-span-2" />
-                              <Textarea
-                                name="recommendationNotes"
-                                defaultValue={item.filamentRecommendation?.notes ?? ""}
-                                className="lg:col-span-2"
-                              />
+                                </div>
+                              </fieldset>
+                              <LabeledField label="Usage notes" className="lg:col-span-2">
+                                <Textarea name="notes" defaultValue={item.notes ?? ""} />
+                              </LabeledField>
+                              <LabeledField label="Compatibility / recommendation notes" className="lg:col-span-2">
+                                <Textarea
+                                  name="recommendationNotes"
+                                  defaultValue={item.filamentRecommendation?.notes ?? ""}
+                                />
+                              </LabeledField>
                               <div className="lg:col-span-2">
                                 <SubmitButton>Save changes</SubmitButton>
                               </div>

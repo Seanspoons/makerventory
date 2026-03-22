@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { ArrowRight, Search } from "lucide-react";
+import { LabeledField } from "@/components/forms/labeled-field";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { Button } from "@/components/ui/button";
@@ -216,22 +217,21 @@ export default async function SearchPage(props: { searchParams?: SearchParams })
           description="Jump straight to printers, stock, setup hardware, and planning records without hunting through each workspace surface."
           action={
             <form method="get" action="/search" className="w-full max-w-xl">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <label className="sr-only" htmlFor="workspace-search">
-                  Search your workshop
-                </label>
-                <Input
-                  id="workspace-search"
-                  name="q"
-                  defaultValue={query}
-                  placeholder="Search by printer, filament, plate, hotend, notes, or vendor"
-                  autoFocus
-                />
-                <Button type="submit" className="shrink-0 !text-white [&_svg]:!text-white">
-                  <Search className="mr-2 h-4 w-4" />
-                  Search
-                </Button>
-              </div>
+              <LabeledField label="Search your workshop" className="w-full">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Input
+                    id="workspace-search"
+                    name="q"
+                    defaultValue={query}
+                    placeholder="Search by printer, filament, plate, hotend, notes, or vendor"
+                    autoFocus
+                  />
+                  <Button type="submit" className="shrink-0 !text-white [&_svg]:!text-white">
+                    <Search className="mr-2 h-4 w-4" />
+                    Search
+                  </Button>
+                </div>
+              </LabeledField>
             </form>
           }
         />
