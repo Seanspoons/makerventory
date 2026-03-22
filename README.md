@@ -59,6 +59,12 @@ npm run dev
 
 5. Open `http://localhost:3000`, create an account, and enter your own inventory data.
 
+6. Run the focused regression suite when changing core workflow logic:
+
+```bash
+npm test
+```
+
 Password reset in local development:
 
 - set `ALLOW_INSECURE_DEV_RESET_LINKS=true` only in local/dev environments if you want Makerventory to surface a reset link directly in the UI flash message
@@ -208,6 +214,12 @@ Docker stack can be validated with:
 
 ```bash
 docker compose config
+```
+
+Focused regression coverage can be run with:
+
+```bash
+npm test
 ```
 
 ## Notes
