@@ -31,10 +31,13 @@ export function AppSidebar({
       </div>
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-        <div className="flex items-center gap-2 break-words text-sm text-slate-300">
+        <Link
+          href="/search"
+          className="flex items-center gap-2 break-words rounded-xl text-sm text-slate-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
           <Search className="h-4 w-4" />
-          <span className="min-w-0 break-words">{workspaceName}</span>
-        </div>
+          <span className="min-w-0 break-words">Search {workspaceName}</span>
+        </Link>
       </div>
 
       <nav className="mt-6 space-y-6">
