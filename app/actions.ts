@@ -12,6 +12,8 @@ import type { ImportEntityType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
+import { sendPasswordResetEmail } from "@/lib/email";
+import { allowInsecureDevResetLinks, ConfigurationError } from "@/lib/env";
 import { setFlashMessage } from "@/lib/flash";
 import { getRequestLogContext, logError, logInfo } from "@/lib/logger";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -1202,6 +1204,9 @@ export async function requestPasswordReset(formData: FormData) {
 
     const { email } = parsed.data;
     const clientIp = await getClientIdentifier();
+    const requestContext = await getRequestLogContext({
+      emailDomain: email.split("@")[1] ?? "unknown",
+    });
     await assertRateLimit({
       action: "auth:password-reset-request",
       identifier: `${clientIp}:${email}`,
@@ -1227,7 +1232,13 @@ export async function requestPasswordReset(formData: FormData) {
         },
       });
 
-      if (process.env.ALLOW_INSECURE_DEV_RESET_LINKS === "true") {
+      const delivery = await sendPasswordResetEmail({
+        to: email,
+        token: rawToken,
+        requestId: String(requestContext.requestId ?? ""),
+      });
+
+      if (!delivery && allowInsecureDevResetLinks()) {
         await setFlashMessage({
           type: "success",
           title: "Reset link generated",
@@ -1248,6 +1259,17 @@ export async function requestPasswordReset(formData: FormData) {
       });
     }
   } catch (error) {
+    if (error instanceof ConfigurationError) {
+      logError("auth.password_reset_misconfigured", error, await getRequestLogContext());
+      await setFlashMessage({
+        type: "error",
+        title: "Password reset is not available",
+        message:
+          "Email delivery is not configured yet. Finish the mail setup before offering password reset in this environment.",
+      });
+      redirect("/forgot-password");
+    }
+
     if (error instanceof RateLimitError) {
       await setFlashMessage({
         type: "error",
@@ -1257,6 +1279,7 @@ export async function requestPasswordReset(formData: FormData) {
       redirect("/forgot-password");
     }
 
+    logError("auth.password_reset_request_failed", error, await getRequestLogContext());
     throw error;
   }
 

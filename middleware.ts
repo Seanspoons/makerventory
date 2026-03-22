@@ -1,5 +1,6 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import { getAuthSecret } from "@/lib/env";
 
 export default withAuth(
   function middleware(request) {
@@ -16,6 +17,7 @@ export default withAuth(
     return response;
   },
   {
+    secret: getAuthSecret(),
     callbacks: {
       authorized: ({ token }) =>
         Boolean(token?.sub && token.workspaceId && !token.sessionRevoked),
