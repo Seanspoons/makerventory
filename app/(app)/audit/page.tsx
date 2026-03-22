@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
+import { summarizeAuditMetadata } from "@/lib/audit-presenters";
 import { getAuditEvents } from "@/lib/data";
 import { formatEntityName } from "@/lib/utils";
 
@@ -68,28 +69,7 @@ export default async function AuditPage() {
 }
 
 function AuditMetadataSummary({ metadata }: { metadata: unknown }) {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return (
-      <pre className="max-w-[420px] overflow-x-auto whitespace-pre-wrap rounded-[18px] bg-slate-950 p-3 text-xs leading-6 text-slate-100">
-        {JSON.stringify(metadata, null, 2)}
-      </pre>
-    );
-  }
-
-  const record = metadata as Record<string, unknown>;
-  const rowsChanged =
-    typeof record.updatedRows === "number"
-      ? `${record.updatedRows} rows changed`
-      : typeof record.restoredRows === "number"
-        ? `${record.restoredRows} rows restored`
-        : typeof record.totalRows === "number"
-          ? `${record.totalRows} rows in job`
-          : null;
-
-  const sourceImport =
-    typeof record.sourceImportJobId === "string" ? "Created from an earlier import job." : null;
-  const mappingNote = record.previousRows ? "Previous row decisions were captured for recovery." : null;
-  const notes = [rowsChanged, sourceImport, mappingNote].filter(Boolean);
+  const notes = summarizeAuditMetadata(metadata);
 
   if (notes.length === 0) {
     return (

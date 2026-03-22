@@ -25,6 +25,11 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getImportJobs } from "@/lib/data";
 import { importEntityOptions, importFieldConfigs } from "@/lib/imports";
+import {
+  canEditImportResolution,
+  countImportRowsByFilter,
+  resolutionLabel,
+} from "@/lib/import-workflow";
 import { cn, formatEntityName } from "@/lib/utils";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -63,35 +68,11 @@ function canSkipRow(status: ImportRowStatus) {
   return status === ImportRowStatus.NEW || status === ImportRowStatus.MATCHED;
 }
 
-function resolutionLabel(resolution: ImportRowResolution) {
-  if (resolution === "UPDATE_MATCH") return "Update matched item";
-  if (resolution === "SKIP") return "Keep staged for later";
-  return "Create as new item";
-}
-
 function reviewToneClasses(severity: "blocker" | "warning" | "info" | "safe") {
   if (severity === "blocker") return "border-rose-200 bg-rose-50 text-rose-800";
   if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
   if (severity === "safe") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function rowFilterCount(
-  filter: (typeof rowStatusFilters)[number]["value"],
-  rows: Array<{ status: ImportRowStatus }>,
-) {
-  if (filter === "all") return rows.length;
-  if (filter === "ready") {
-    return rows.filter((row) => row.status === ImportRowStatus.NEW || row.status === ImportRowStatus.MATCHED).length;
-  }
-  if (filter === "matched") return rows.filter((row) => row.status === ImportRowStatus.MATCHED).length;
-  if (filter === "new") return rows.filter((row) => row.status === ImportRowStatus.NEW).length;
-  if (filter === "blocked") {
-    return rows.filter((row) => row.status === ImportRowStatus.CONFLICT || row.status === ImportRowStatus.ERROR).length;
-  }
-  if (filter === "skipped") return rows.filter((row) => row.status === ImportRowStatus.SKIPPED).length;
-  if (filter === "applied") return rows.filter((row) => row.status === ImportRowStatus.APPLIED).length;
-  return rows.length;
 }
 
 export default async function ImportsPage(props: { searchParams?: SearchParams }) {
@@ -696,7 +677,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       className={cn("w-full sm:w-auto", isActive ? "!text-white [&_svg]:!text-white" : "")}
                     >
                       <Link href={href as Parameters<typeof Link>[0]["href"]}>
-                        {filter.label} ({rowFilterCount(filter.value, selectedJob.rows)})
+                        {filter.label} ({countImportRowsByFilter(filter.value, selectedJob.rows)})
                       </Link>
                     </Button>
                   );
@@ -740,10 +721,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       <div>
                         <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Apply as</p>
                         <div className="mt-2">
-                          {selectedJob.status === "STAGED" &&
-                          row.status !== ImportRowStatus.APPLIED &&
-                          row.status !== ImportRowStatus.ERROR &&
-                          row.status !== ImportRowStatus.CONFLICT ? (
+                          {selectedJob.status === "STAGED" && canEditImportResolution(row.status) ? (
                             <form action={updateImportRowResolution} className="space-y-2">
                               <input type="hidden" name="rowId" value={row.id} />
                               <input type="hidden" name="returnTo" value={selectedJobHref} />
@@ -860,10 +838,7 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                           </div>
                         </td>
                         <td className="min-w-[220px] px-4 py-4 text-slate-600">
-                          {selectedJob.status === "STAGED" &&
-                          row.status !== ImportRowStatus.APPLIED &&
-                          row.status !== ImportRowStatus.ERROR &&
-                          row.status !== ImportRowStatus.CONFLICT ? (
+                          {selectedJob.status === "STAGED" && canEditImportResolution(row.status) ? (
                             <form action={updateImportRowResolution} className="space-y-2">
                               <input type="hidden" name="rowId" value={row.id} />
                               <input type="hidden" name="returnTo" value={selectedJobHref} />

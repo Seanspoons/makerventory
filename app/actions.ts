@@ -24,6 +24,15 @@ import {
   readCsvFile,
   stageImportRecords,
 } from "@/lib/imports";
+import {
+  buildCorrectionReviewRecords,
+  buildImportBulkUndoSnapshot,
+  type ImportBulkUndoSnapshot,
+  restoreRowsFromBulkUndo,
+  selectRowsForBulkOperation,
+  summarizeImportRows,
+} from "@/lib/import-workflow";
+import { deriveBuildPlateStatus, deriveHotendStatus } from "@/lib/inventory-rules";
 import { prisma } from "@/lib/prisma";
 import {
   assertRateLimit,
@@ -102,16 +111,6 @@ function importEntityLabel(value: string) {
   return formatEntityName(value).toLowerCase();
 }
 
-function stringifyImportPayload(data: Prisma.JsonValue) {
-  const payload = data as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.entries(payload).map(([key, value]) => [
-      key,
-      value === null || value === undefined ? "" : String(value),
-    ]),
-  );
-}
-
 function selectedIds(formData: FormData, key: string) {
   return Array.from(
     new Set(
@@ -179,14 +178,11 @@ async function setPrinterInstalledHotend(
       await tx.hotend.update({
         where: { id: candidateId },
         data: {
-          status:
-            hotend.status === "RETIRED"
-              ? "RETIRED"
-              : assignedCount > 0
-                ? "IN_USE"
-                : hotend.quantity <= 1
-                  ? "LOW_STOCK"
-                  : "AVAILABLE",
+          status: deriveHotendStatus({
+            quantity: hotend.quantity,
+            installedPrinterId: assignedCount > 0 ? "assigned" : null,
+            persistedStatus: hotend.status,
+          }),
         },
       });
     }
@@ -229,7 +225,12 @@ async function setPrinterInstalledPlate(
     if (plate && plate.status !== "RETIRED" && plate.status !== "WORN") {
       await tx.buildPlate.update({
         where: { id: candidateId },
-        data: { status: assignedCount > 0 ? "IN_USE" : "AVAILABLE" },
+        data: {
+          status: deriveBuildPlateStatus({
+            installedPrinterId: assignedCount > 0 ? "assigned" : null,
+            persistedStatus: plate.status,
+          }),
+        },
       });
     }
   }
@@ -256,15 +257,6 @@ async function setPrinterMaterialSystems(
       data: { assignedPrinterId: printerId },
     });
   }
-}
-
-function summarizeImportRows(rows: Array<{ status: string }>) {
-  return {
-    newRows: rows.filter((item) => item.status === "NEW").length,
-    matchedRows: rows.filter((item) => item.status === "MATCHED").length,
-    conflictRows: rows.filter((item) => item.status === "CONFLICT").length,
-    skippedRows: rows.filter((item) => item.status === "SKIPPED" || item.status === "ERROR").length,
-  };
 }
 
 async function getWorkspaceContext() {
@@ -2006,21 +1998,7 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     throw new Error("Only staged imports can be edited.");
   }
 
-  const rowsToUpdate = job.rows.filter((row) => {
-    if (row.status === "APPLIED" || row.status === "CONFLICT" || row.status === "ERROR") {
-      return false;
-    }
-
-    if (operation === "set_matched_update") {
-      return Boolean(row.suggestedMatchId) && row.validationErrors.length === 0;
-    }
-
-    if (operation === "set_unmatched_create") {
-      return !row.suggestedMatchId && row.validationErrors.length === 0;
-    }
-
-    return row.status === "NEW" || row.status === "MATCHED";
-  });
+  const rowsToUpdate = selectRowsForBulkOperation(job.rows, operation as Parameters<typeof selectRowsForBulkOperation>[1]);
 
   if (rowsToUpdate.length === 0) {
     await setFlashMessage({
@@ -2035,13 +2013,10 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     return;
   }
 
-  const previousRows = rowsToUpdate.map((row) => ({
-    id: row.id,
-    status: row.status,
-    resolution: row.resolution,
-    resolvedMatchId: row.resolvedMatchId,
-    resolvedMatchSlug: row.resolvedMatchSlug,
-  }));
+  const previousRows = buildImportBulkUndoSnapshot(
+    operation as Parameters<typeof buildImportBulkUndoSnapshot>[0],
+    rowsToUpdate,
+  );
 
   await prisma.$transaction(
     rowsToUpdate.map((row) => {
@@ -2090,12 +2065,7 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     where: { id: jobId },
     data: {
       ...summarizeImportRows(refreshedRows),
-      lastBulkAction: {
-        operation,
-        updatedRows: rowsToUpdate.length,
-        createdAt: new Date().toISOString(),
-        rows: previousRows,
-      },
+      lastBulkAction: previousRows,
     },
   });
 
@@ -2123,7 +2093,7 @@ export async function updateImportJobRowsBulk(formData: FormData) {
     metadata: {
       operation,
       updatedRows: rowsToUpdate.length,
-      previousRows,
+      previousRows: previousRows.rows,
     },
   });
 
@@ -2161,19 +2131,11 @@ export async function undoImportJobBulkUpdate(formData: FormData) {
     throw new Error("Only staged import jobs can undo batch decisions.");
   }
 
-  const snapshot = job.lastBulkAction as
-    | {
-        rows?: Array<{
-          id: string;
-          status: "NEW" | "MATCHED" | "SKIPPED" | "ERROR" | "CONFLICT" | "APPLIED";
-          resolution: "CREATE_NEW" | "UPDATE_MATCH" | "SKIP";
-          resolvedMatchId: string | null;
-          resolvedMatchSlug: string | null;
-        }>;
-      }
-    | null;
+  const snapshot = job.lastBulkAction as ImportBulkUndoSnapshot | null;
 
-  if (!snapshot?.rows?.length) {
+  const rowsToRestore = restoreRowsFromBulkUndo(snapshot);
+
+  if (!rowsToRestore.length) {
     await setFlashMessage({
       type: "error",
       title: "Nothing to undo",
@@ -2187,7 +2149,7 @@ export async function undoImportJobBulkUpdate(formData: FormData) {
   }
 
   await prisma.$transaction(
-    snapshot.rows.map((row) =>
+    rowsToRestore.map((row) =>
       prisma.importRow.update({
         where: { id: row.id },
         data: {
@@ -2223,14 +2185,14 @@ export async function undoImportJobBulkUpdate(formData: FormData) {
     summary: "Undid the most recent batch row decision.",
     metadata: {
       importJobId: job.id,
-      restoredRows: snapshot.rows.length,
+      restoredRows: rowsToRestore.length,
     },
   });
 
   await setFlashMessage({
     type: "success",
     title: "Batch decision restored",
-    message: `${snapshot.rows.length} row(s) were restored to their previous review state.`,
+    message: `${rowsToRestore.length} row(s) were restored to their previous review state.`,
   });
   revalidatePath("/imports");
   if (returnTo) {
@@ -2252,7 +2214,7 @@ export async function stageCorrectionImportReview(formData: FormData) {
     throw new Error("Import job not found.");
   }
 
-  const records = job.rows.map((row) => stringifyImportPayload(row.data));
+  const records = buildCorrectionReviewRecords(job.rows);
   const rows = await stageImportRecords(workspaceId, job.entityType, records);
   const correctionJob = await createImportJobWithRows({
     workspaceId,
