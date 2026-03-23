@@ -94,6 +94,45 @@ docker compose down -v
 
 Use `docker compose down -v` only when you intentionally want to discard the local Docker database volume.
 
+## Production Docker Image
+
+Makerventory now includes a dedicated production image path in [Dockerfile.production](/Users/seanwotherspoon/GitHub/makerventory/Dockerfile.production).
+
+Build the image:
+
+```bash
+docker build -f Dockerfile.production -t makerventory:prod .
+```
+
+Run the image:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e NEXTAUTH_URL="https://your-app.example.com" \
+  -e AUTH_SECRET="replace-with-a-long-random-secret" \
+  -e RESEND_API_KEY="re_..." \
+  -e EMAIL_FROM="Makerventory <noreply@yourdomain.com>" \
+  makerventory:prod
+```
+
+Optional migration-on-start:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e NEXTAUTH_URL="https://your-app.example.com" \
+  -e AUTH_SECRET="replace-with-a-long-random-secret" \
+  -e RUN_DB_MIGRATIONS="true" \
+  makerventory:prod
+```
+
+Notes:
+
+- `RUN_DB_MIGRATIONS=true` is useful for small self-managed deployments, but many hosted setups should run `npm run db:deploy` as a separate release step instead.
+- the production image uses `next start`, not the dev server.
+- the existing `Dockerfile` and `docker-compose.yml` remain dev-oriented on purpose.
+
 ## Required Services For Hosted Deployment
 
 Recommended hosted stack:
