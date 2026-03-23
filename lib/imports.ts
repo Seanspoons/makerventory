@@ -1422,171 +1422,186 @@ export async function createImportJobWithRows(args: {
 
 export async function applyImportJobRows(jobId: string, workspaceId: string) {
   const appliedAt = new Date();
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, workspaceId },
+    include: { rows: { orderBy: { rowIndex: "asc" } } },
+  });
 
-  return prisma.$transaction(async (tx) => {
-    const job = await tx.importJob.findFirst({
-      where: { id: jobId, workspaceId },
-      include: { rows: { orderBy: { rowIndex: "asc" } } },
-    });
+  if (!job) {
+    throw new Error("Import job not found.");
+  }
 
-    if (!job) {
-      throw new Error("Import job not found.");
+  if (job.status === ImportJobStatus.APPLIED) {
+    throw new Error("Import job has already been applied.");
+  }
+
+  const operations: Prisma.PrismaPromise<unknown>[] = [];
+
+  for (const row of job.rows) {
+    if (
+      row.status === ImportRowStatus.ERROR ||
+      row.status === ImportRowStatus.SKIPPED ||
+      row.status === ImportRowStatus.CONFLICT
+    ) {
+      continue;
     }
 
-    if (job.status === ImportJobStatus.APPLIED) {
-      throw new Error("Import job has already been applied.");
+    if (row.resolution === IMPORT_ROW_RESOLUTIONS.SKIP) {
+      continue;
     }
 
-    for (const row of job.rows) {
-      if (
-        row.status === ImportRowStatus.ERROR ||
-        row.status === ImportRowStatus.SKIPPED ||
-        row.status === ImportRowStatus.CONFLICT
-      ) {
-        continue;
-      }
+    const payload = row.data as Record<string, unknown>;
 
-      if (row.resolution === IMPORT_ROW_RESOLUTIONS.SKIP) {
-        continue;
-      }
+    if (job.entityType === IMPORT_ENTITY_TYPES.PRINTER) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        brand: String(payload.brand ?? ""),
+        model: String(payload.model ?? ""),
+        buildVolumeX: Number(payload.buildVolumeX ?? 256),
+        buildVolumeY: Number(payload.buildVolumeY ?? 256),
+        buildVolumeZ: Number(payload.buildVolumeZ ?? 256),
+        location: (payload.location as string | null) ?? null,
+        status: String(payload.status ?? PrinterStatus.ACTIVE) as PrinterStatus,
+        notes: (payload.notes as string | null) ?? null,
+      };
 
-      const payload = row.data as Record<string, unknown>;
-
-      if (job.entityType === IMPORT_ENTITY_TYPES.PRINTER) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          brand: String(payload.brand ?? ""),
-          model: String(payload.model ?? ""),
-          buildVolumeX: Number(payload.buildVolumeX ?? 256),
-          buildVolumeY: Number(payload.buildVolumeY ?? 256),
-          buildVolumeZ: Number(payload.buildVolumeZ ?? 256),
-          location: (payload.location as string | null) ?? null,
-          status: String(payload.status ?? PrinterStatus.ACTIVE) as PrinterStatus,
-          notes: (payload.notes as string | null) ?? null,
-        };
-
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.printer.update({
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.printer.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.printer.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.printer.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.MATERIAL_SYSTEM) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          type: String(payload.type ?? MaterialSystemType.DRYER) as MaterialSystemType,
-          status: String(payload.status ?? MaterialSystemStatus.ACTIVE) as MaterialSystemStatus,
-          supportedMaterialsNotes: (payload.supportedMaterialsNotes as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        };
+    if (job.entityType === IMPORT_ENTITY_TYPES.MATERIAL_SYSTEM) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        type: String(payload.type ?? MaterialSystemType.DRYER) as MaterialSystemType,
+        status: String(payload.status ?? MaterialSystemStatus.ACTIVE) as MaterialSystemStatus,
+        supportedMaterialsNotes: (payload.supportedMaterialsNotes as string | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+      };
 
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.materialSystem.update({
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.materialSystem.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.materialSystem.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.materialSystem.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.BUILD_PLATE) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          sizeMm: Number(payload.sizeMm ?? 256),
-          surfaceType: String(payload.surfaceType ?? ""),
-          status: String(payload.status ?? BuildPlateStatus.AVAILABLE) as BuildPlateStatus,
-          notes: (payload.notes as string | null) ?? null,
-        };
+    if (job.entityType === IMPORT_ENTITY_TYPES.BUILD_PLATE) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        sizeMm: Number(payload.sizeMm ?? 256),
+        surfaceType: String(payload.surfaceType ?? ""),
+        status: String(payload.status ?? BuildPlateStatus.AVAILABLE) as BuildPlateStatus,
+        notes: (payload.notes as string | null) ?? null,
+      };
 
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.buildPlate.update({
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.buildPlate.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.buildPlate.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.buildPlate.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.HOTEND) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          nozzleSize: Number(payload.nozzleSize ?? 0.4),
-          materialType: String(payload.materialType ?? ""),
-          quantity: Number(payload.quantity ?? 1),
-          status: String(payload.status ?? HotendStatus.AVAILABLE) as HotendStatus,
-          notes: (payload.notes as string | null) ?? null,
-        };
+    if (job.entityType === IMPORT_ENTITY_TYPES.HOTEND) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        nozzleSize: Number(payload.nozzleSize ?? 0.4),
+        materialType: String(payload.materialType ?? ""),
+        quantity: Number(payload.quantity ?? 1),
+        status: String(payload.status ?? HotendStatus.AVAILABLE) as HotendStatus,
+        notes: (payload.notes as string | null) ?? null,
+      };
 
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.hotend.update({
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.hotend.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.hotend.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.hotend.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.FILAMENT) {
-        const common = {
-          brand: String(payload.brand ?? ""),
-          materialType: String(payload.materialType ?? ""),
-          subtype: (payload.subtype as string | null) ?? null,
-          finish: (payload.finish as string | null) ?? null,
-          color: String(payload.color ?? ""),
-          quantity: Number(payload.quantity ?? 1),
-          estimatedRemainingGrams: Number(payload.estimatedRemainingGrams ?? 1000),
-          storageLocation: (payload.storageLocation as string | null) ?? null,
-          status: String(payload.status ?? StockStatus.HEALTHY) as StockStatus,
-          opened: Boolean(payload.opened),
-          nearlyEmpty: Boolean(payload.nearlyEmpty),
-          abrasive: Boolean(payload.abrasive),
-          dryingRequired: Boolean(payload.dryingRequired),
-          hygroscopicLevel:
-            (payload.hygroscopicLevel as FilamentHygroscopicLevel | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-          compatibilityTags: Boolean(payload.abrasive)
-            ? ["Abrasive", "Hardened Nozzle"]
-            : Boolean(payload.dryingRequired)
-              ? ["Dryer Recommended"]
-              : ["General Purpose"],
-        };
+    if (job.entityType === IMPORT_ENTITY_TYPES.FILAMENT) {
+      const common = {
+        brand: String(payload.brand ?? ""),
+        materialType: String(payload.materialType ?? ""),
+        subtype: (payload.subtype as string | null) ?? null,
+        finish: (payload.finish as string | null) ?? null,
+        color: String(payload.color ?? ""),
+        quantity: Number(payload.quantity ?? 1),
+        estimatedRemainingGrams: Number(payload.estimatedRemainingGrams ?? 1000),
+        storageLocation: (payload.storageLocation as string | null) ?? null,
+        status: String(payload.status ?? StockStatus.HEALTHY) as StockStatus,
+        opened: Boolean(payload.opened),
+        nearlyEmpty: Boolean(payload.nearlyEmpty),
+        abrasive: Boolean(payload.abrasive),
+        dryingRequired: Boolean(payload.dryingRequired),
+        hygroscopicLevel:
+          (payload.hygroscopicLevel as FilamentHygroscopicLevel | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+        compatibilityTags: Boolean(payload.abrasive)
+          ? ["Abrasive", "Hardened Nozzle"]
+          : Boolean(payload.dryingRequired)
+            ? ["Dryer Recommended"]
+            : ["General Purpose"],
+      };
 
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.filamentSpool.update({
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.filamentSpool.update({
             where: { id: row.resolvedMatchId },
             data: {
               ...common,
               filamentRecommendation: {
                 upsert: {
                   create: {
-                    recommendedNozzle:
-                      (payload.recommendedNozzle as string | null) ?? null,
+                    recommendedNozzle: (payload.recommendedNozzle as string | null) ?? null,
                     dryerSuggested: Boolean(payload.dryerSuggested),
                     hardenedNozzleNeeded: Boolean(payload.hardenedNozzleNeeded),
                     notes: (payload.recommendationNotes as string | null) ?? null,
                   },
                   update: {
-                    recommendedNozzle:
-                      (payload.recommendedNozzle as string | null) ?? null,
+                    recommendedNozzle: (payload.recommendedNozzle as string | null) ?? null,
                     dryerSuggested: Boolean(payload.dryerSuggested),
                     hardenedNozzleNeeded: Boolean(payload.hardenedNozzleNeeded),
                     notes: (payload.recommendationNotes as string | null) ?? null,
@@ -1594,155 +1609,183 @@ export async function applyImportJobRows(jobId: string, workspaceId: string) {
                 },
               },
             },
-          });
-        } else {
-          await tx.filamentSpool.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.filamentSpool.create({
             data: {
               workspaceId,
               ...common,
               filamentRecommendation: {
                 create: {
-                  recommendedNozzle:
-                    (payload.recommendedNozzle as string | null) ?? null,
+                  recommendedNozzle: (payload.recommendedNozzle as string | null) ?? null,
                   dryerSuggested: Boolean(payload.dryerSuggested),
                   hardenedNozzleNeeded: Boolean(payload.hardenedNozzleNeeded),
                   notes: (payload.recommendationNotes as string | null) ?? null,
                 },
               },
             },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.CONSUMABLE) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          category: String(payload.category ?? ""),
-          quantity: Number(payload.quantity ?? 1),
-          unit: String(payload.unit ?? ""),
-          reorderThreshold: Number(payload.reorderThreshold ?? 1),
-          status: deriveConsumableStatus(
-            Number(payload.quantity ?? 1),
-            Number(payload.reorderThreshold ?? 1),
-          ),
-          storageLocation: (payload.storageLocation as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        };
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.consumableItem.update({
+    if (job.entityType === IMPORT_ENTITY_TYPES.CONSUMABLE) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        category: String(payload.category ?? ""),
+        quantity: Number(payload.quantity ?? 1),
+        unit: String(payload.unit ?? ""),
+        reorderThreshold: Number(payload.reorderThreshold ?? 1),
+        status: deriveConsumableStatus(
+          Number(payload.quantity ?? 1),
+          Number(payload.reorderThreshold ?? 1),
+        ),
+        storageLocation: (payload.storageLocation as string | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+      };
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.consumableItem.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.consumableItem.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.consumableItem.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.SAFETY) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          type: String(payload.type ?? ""),
-          status: String(payload.status ?? SafetyStatus.ACTIVE) as SafetyStatus,
-          replacementSchedule: (payload.replacementSchedule as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        };
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.safetyEquipment.update({
+    if (job.entityType === IMPORT_ENTITY_TYPES.SAFETY) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        type: String(payload.type ?? ""),
+        status: String(payload.status ?? SafetyStatus.ACTIVE) as SafetyStatus,
+        replacementSchedule: (payload.replacementSchedule as string | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+      };
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.safetyEquipment.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.safetyEquipment.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.safetyEquipment.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.SMART_PLUG) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          assignedDeviceLabel: (payload.assignedDeviceLabel as string | null) ?? null,
-          status: String(payload.status ?? SmartPlugStatus.ONLINE) as SmartPlugStatus,
-          powerMonitoringCapable: Boolean(payload.powerMonitoringCapable),
-          notes: (payload.notes as string | null) ?? null,
-        };
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.smartPlug.update({
+    if (job.entityType === IMPORT_ENTITY_TYPES.SMART_PLUG) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        assignedDeviceLabel: (payload.assignedDeviceLabel as string | null) ?? null,
+        status: String(payload.status ?? SmartPlugStatus.ONLINE) as SmartPlugStatus,
+        powerMonitoringCapable: Boolean(payload.powerMonitoringCapable),
+        notes: (payload.notes as string | null) ?? null,
+      };
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.smartPlug.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.smartPlug.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.smartPlug.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.TOOL_PART) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          category: String(payload.category ?? ""),
-          quantity: Number(payload.quantity ?? 1),
-          storageLocation: (payload.storageLocation as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        };
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.toolPart.update({
+    if (job.entityType === IMPORT_ENTITY_TYPES.TOOL_PART) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        category: String(payload.category ?? ""),
+        quantity: Number(payload.quantity ?? 1),
+        storageLocation: (payload.storageLocation as string | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+      };
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.toolPart.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.toolPart.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.toolPart.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      if (job.entityType === IMPORT_ENTITY_TYPES.WISHLIST) {
-        const common = {
-          name: String(payload.name ?? ""),
-          slug: slugify(String(payload.name ?? "")),
-          category: String(payload.category ?? ""),
-          priority: String(payload.priority ?? WishlistPriority.MEDIUM) as WishlistPriority,
-          status: String(payload.status ?? WishlistStatus.PLANNED) as WishlistStatus,
-          estimatedCost: Number(payload.estimatedCost ?? 0),
-          vendor: (payload.vendor as string | null) ?? null,
-          purchaseUrl: (payload.purchaseUrl as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        };
-        if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
-          await tx.wishlistItem.update({
+    if (job.entityType === IMPORT_ENTITY_TYPES.WISHLIST) {
+      const common = {
+        name: String(payload.name ?? ""),
+        slug: slugify(String(payload.name ?? "")),
+        category: String(payload.category ?? ""),
+        priority: String(payload.priority ?? WishlistPriority.MEDIUM) as WishlistPriority,
+        status: String(payload.status ?? WishlistStatus.PLANNED) as WishlistStatus,
+        estimatedCost: Number(payload.estimatedCost ?? 0),
+        vendor: (payload.vendor as string | null) ?? null,
+        purchaseUrl: (payload.purchaseUrl as string | null) ?? null,
+        notes: (payload.notes as string | null) ?? null,
+      };
+      if (row.resolution === IMPORT_ROW_RESOLUTIONS.UPDATE_MATCH && row.resolvedMatchId) {
+        operations.push(
+          prisma.wishlistItem.update({
             where: { id: row.resolvedMatchId },
             data: common,
-          });
-        } else {
-          await tx.wishlistItem.create({
+          }),
+        );
+      } else {
+        operations.push(
+          prisma.wishlistItem.create({
             data: { workspaceId, ...common },
-          });
-        }
+          }),
+        );
       }
+    }
 
-      await tx.importRow.update({
+    operations.push(
+      prisma.importRow.update({
         where: { id: row.id },
         data: {
           status: ImportRowStatus.APPLIED,
           appliedAt,
         },
-      });
-    }
+      }),
+    );
+  }
 
-    return tx.importJob.update({
+  operations.push(
+    prisma.importJob.update({
       where: { id: job.id },
       data: {
         status: ImportJobStatus.APPLIED,
         appliedAt,
       },
-    });
-  });
+    }),
+  );
+
+  const results = await prisma.$transaction(operations);
+  return results.at(-1) as Awaited<ReturnType<typeof prisma.importJob.update>>;
 }
