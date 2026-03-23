@@ -76,8 +76,12 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild variant="secondary">
-                <Link href="/welcome?step=printer">Add first printer</Link>
+              <Button
+                asChild
+                variant="secondary"
+                className="!text-slate-950 [&_svg]:!text-slate-950"
+              >
+                <Link href="/welcome?step=printer#first-printer-step">Add first printer</Link>
               </Button>
             </div>
           </div>
@@ -104,45 +108,47 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
       </SectionCard>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <SectionCard
-          title="1. Add your first printer"
-          description="A single printer record is enough to make the rest of the workspace easier to understand."
-          className={step === "printer" ? "ring-1 ring-slate-300" : undefined}
-        >
-          <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
-            <input type="hidden" name="kind" value="printer" />
-            <input type="hidden" name="returnTo" value="/welcome?step=filament" />
-            <LabeledField label="Printer name">
-              <Input name="name" placeholder="Bambu Lab A1 Mini" required />
-            </LabeledField>
-            <LabeledField label="Brand">
-              <Input name="brand" placeholder="Bambu Lab" required />
-            </LabeledField>
-            <LabeledField label="Model">
-              <Input name="model" placeholder="A1 Mini" required />
-            </LabeledField>
-            <LabeledField label="Location">
-              <Input name="location" placeholder="Bench location" />
-            </LabeledField>
-            <LabeledField label="Build volume X">
-              <Input name="buildVolumeX" type="number" placeholder="180" required />
-            </LabeledField>
-            <LabeledField label="Build volume Y">
-              <Input name="buildVolumeY" type="number" placeholder="180" required />
-            </LabeledField>
-            <LabeledField label="Build volume Z">
-              <Input name="buildVolumeZ" type="number" placeholder="180" required />
-            </LabeledField>
-            <LabeledField label="Notes" className="lg:col-span-2">
-              <Textarea name="notes" placeholder="Optional workshop notes" />
-            </LabeledField>
-            <div className="lg:col-span-2">
-              <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-slate-950">
-                Add first printer
-              </SubmitButton>
-            </div>
-          </form>
-        </SectionCard>
+        <div id="first-printer-step">
+          <SectionCard
+            title="1. Add your first printer"
+            description="A single printer record is enough to make the rest of the workspace easier to understand."
+            className={step === "printer" ? "ring-1 ring-slate-300" : undefined}
+          >
+            <form action={createInventoryItem} className="grid gap-4 lg:grid-cols-2">
+              <input type="hidden" name="kind" value="printer" />
+              <input type="hidden" name="returnTo" value="/welcome?step=filament" />
+              <LabeledField label="Printer name">
+                <Input name="name" placeholder="Bambu Lab A1 Mini" required />
+              </LabeledField>
+              <LabeledField label="Brand">
+                <Input name="brand" placeholder="Bambu Lab" required />
+              </LabeledField>
+              <LabeledField label="Model">
+                <Input name="model" placeholder="A1 Mini" required />
+              </LabeledField>
+              <LabeledField label="Location">
+                <Input name="location" placeholder="Bench location" />
+              </LabeledField>
+              <LabeledField label="Build volume X">
+                <Input name="buildVolumeX" type="number" placeholder="180" required />
+              </LabeledField>
+              <LabeledField label="Build volume Y">
+                <Input name="buildVolumeY" type="number" placeholder="180" required />
+              </LabeledField>
+              <LabeledField label="Build volume Z">
+                <Input name="buildVolumeZ" type="number" placeholder="180" required />
+              </LabeledField>
+              <LabeledField label="Notes" className="lg:col-span-2">
+                <Textarea name="notes" placeholder="Optional workshop notes" />
+              </LabeledField>
+              <div className="lg:col-span-2">
+                <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-white">
+                  Add first printer
+                </SubmitButton>
+              </div>
+            </form>
+          </SectionCard>
+        </div>
 
         <SectionCard
           title="2. Add your first filament"
