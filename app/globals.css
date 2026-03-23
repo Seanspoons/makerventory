@@ -60,3 +60,19 @@ textarea {
 .sidebar-scroll {
   scrollbar-gutter: stable;
 }
+
+.route-loading-bar {
+  animation: route-loading-slide 1.05s ease-in-out infinite;
+}
+
+@keyframes route-loading-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  60% {
+    transform: translateX(180%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
