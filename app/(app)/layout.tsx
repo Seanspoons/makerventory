@@ -6,8 +6,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { deriveConsumableStatus } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
 async function getDailyFocus(workspaceId: string) {
   const [stagedImports, printers, lowFilament, consumables, wishlist] = await Promise.all([
     prisma.importJob.count({ where: { workspaceId, status: "STAGED" } }),

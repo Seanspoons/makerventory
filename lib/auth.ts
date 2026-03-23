@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { DefaultSession, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
+import { cache } from "react";
 import { getAuthSecret } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -214,8 +215,10 @@ export const authOptions: NextAuthOptions = {
   secret: getAuthSecret(),
 };
 
+const getCachedServerSession = cache(() => getServerSession(authOptions));
+
 export function auth() {
-  return getServerSession(authOptions);
+  return getCachedServerSession();
 }
 
 export async function requireSession() {

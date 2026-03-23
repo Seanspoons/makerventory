@@ -6,15 +6,16 @@ import {
   WishlistStatus,
 } from "@prisma/client";
 import { subDays } from "date-fns";
+import { cache } from "react";
 import { requireSession } from "@/lib/auth";
 import { buildImportRowReview } from "@/lib/import-review";
 import { prisma } from "@/lib/prisma";
 import { deriveConsumableStatus } from "@/lib/utils";
 
-async function getWorkspaceId() {
+const getWorkspaceId = cache(async () => {
   const session = await requireSession();
   return session.user.workspaceId;
-}
+});
 
 export async function getDashboardData() {
   const workspaceId = await getWorkspaceId();
