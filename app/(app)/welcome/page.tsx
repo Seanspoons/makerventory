@@ -137,7 +137,7 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
               <Textarea name="notes" placeholder="Optional workshop notes" />
             </LabeledField>
             <div className="lg:col-span-2">
-              <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-white">
+              <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-slate-950">
                 Add first printer
               </SubmitButton>
             </div>
