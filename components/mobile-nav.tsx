@@ -52,7 +52,7 @@ export function MobileNav({
             </DialogTrigger>
             <DialogContent
               showClose={false}
-              className="w-[calc(100vw-1rem)] max-w-sm rounded-[28px] border-none bg-transparent p-0 shadow-none sm:w-[calc(100vw-2rem)]"
+              className="left-auto right-2 top-2 w-[calc(100vw-1rem)] max-w-sm translate-x-0 translate-y-0 rounded-[28px] border-none bg-transparent p-0 shadow-none sm:right-4 sm:top-4 sm:w-[calc(100vw-2rem)]"
             >
               <div className="rounded-[28px] bg-slate-950 p-5 text-white">
                 <div className="flex items-center justify-between">
