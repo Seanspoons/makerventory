@@ -27,28 +27,28 @@ export function BrandLockup({
           size === "compact" ? "h-12 w-12" : "h-14 w-14",
         )}
       >
-        <img
-          src="/brand/makerventory-mark-light.svg"
-          alt="Makerventory mark"
-          width={size === "compact" ? 32 : 38}
-          height={size === "compact" ? 32 : 38}
-          className={markClassName}
-          draggable={false}
-        />
+        <object
+          type="image/svg+xml"
+          data="/brand/makerventory-mark-light.svg"
+          aria-label="Makerventory mark"
+          className={cn("pointer-events-none block", markClassName)}
+        >
+          Makerventory mark
+        </object>
       </div>
 
       <div className="min-w-0">
-        <img
-          src={wordmarkSrc}
-          alt="MAKERVENTORY"
-          width={size === "compact" ? 220 : 250}
-          height={size === "compact" ? 36 : 40}
+        <object
+          type="image/svg+xml"
+          data={wordmarkSrc}
+          aria-label="MAKERVENTORY"
           className={cn(
-            "h-auto max-w-full",
+            "pointer-events-none block h-auto max-w-full",
             wordmarkWidthClass,
           )}
-          draggable={false}
-        />
+        >
+          MAKERVENTORY
+        </object>
         {subtitle ? (
           <p className={cn("mt-1 text-xs sm:text-sm", darkTheme ? "text-slate-500" : "text-slate-300")}>
             {subtitle}
