@@ -76,23 +76,70 @@ function numberValue(formData: FormData, key: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function revalidateInventory() {
-  [
-    "/dashboard",
-    "/imports",
-    "/audit",
-    "/printers",
-    "/material-systems",
-    "/build-plates",
-    "/hotends",
-    "/filament",
-    "/consumables",
-    "/safety",
-    "/smart-plugs",
-    "/tools-parts",
-    "/wishlist",
-    "/maintenance",
-  ].forEach((path) => revalidatePath(path));
+function revalidatePaths(paths: string[]) {
+  for (const path of new Set(paths)) {
+    revalidatePath(path);
+  }
+}
+
+function inventoryPathsForKind(kind: string) {
+  switch (kind) {
+    case "printer":
+      return ["/printers", "/dashboard"];
+    case "material-system":
+      return ["/material-systems", "/printers", "/dashboard"];
+    case "build-plate":
+      return ["/build-plates", "/printers", "/dashboard"];
+    case "hotend":
+      return ["/hotends", "/printers", "/dashboard"];
+    case "filament":
+      return ["/filament", "/dashboard"];
+    case "consumable":
+      return ["/consumables", "/dashboard"];
+    case "safety":
+      return ["/safety", "/dashboard"];
+    case "smart-plug":
+      return ["/smart-plugs", "/printers", "/dashboard"];
+    case "tool":
+      return ["/tools-parts"];
+    case "wishlist":
+      return ["/wishlist", "/dashboard"];
+    case "maintenance":
+      return ["/maintenance", "/dashboard"];
+    default:
+      return ["/dashboard"];
+  }
+}
+
+function revalidateInventoryKind(kind: string, extraPaths: string[] = []) {
+  revalidatePaths([...inventoryPathsForKind(kind), ...extraPaths]);
+}
+
+function inventoryKindForImportEntityType(entityType: ImportEntityType | "import-job") {
+  const kindByEntityType: Record<string, string> = {
+    PRINTER: "printer",
+    MATERIAL_SYSTEM: "material-system",
+    BUILD_PLATE: "build-plate",
+    HOTEND: "hotend",
+    FILAMENT: "filament",
+    CONSUMABLE: "consumable",
+    SAFETY: "safety",
+    SMART_PLUG: "smart-plug",
+    TOOL_PART: "tool",
+    WISHLIST: "wishlist",
+  };
+
+  return kindByEntityType[entityType] ?? null;
+}
+
+function revalidateImportApply(entityType: ImportEntityType | "import-job") {
+  const kind = inventoryKindForImportEntityType(entityType);
+  if (kind) {
+    revalidateInventoryKind(kind, ["/imports", "/audit"]);
+    return;
+  }
+
+  revalidatePaths(["/imports", "/audit", "/dashboard"]);
 }
 
 function importEntityValue(formData: FormData, key = "entityType") {
@@ -570,7 +617,7 @@ export async function createInventoryItem(formData: FormData) {
     title: "Record created",
     message: "The inventory record was added successfully.",
   });
-  revalidateInventory();
+  revalidateInventoryKind(kind);
   if (returnTo) {
     redirect(returnTo as Parameters<typeof redirect>[0]);
   }
@@ -976,7 +1023,7 @@ export async function updateInventoryItem(formData: FormData) {
     title: "Record updated",
     message: "Your changes were saved successfully.",
   });
-  revalidateInventory();
+  revalidateInventoryKind(kind);
 }
 
 export async function updateAccountProfile(formData: FormData) {
@@ -1480,7 +1527,7 @@ export async function archiveInventoryItem(formData: FormData) {
     title: "Record updated",
     message: "The selected record was updated successfully.",
   });
-  revalidateInventory();
+  revalidateInventoryKind(kind);
 }
 
 export async function updateFilamentState(formData: FormData) {
@@ -1580,7 +1627,6 @@ export async function updateFilamentState(formData: FormData) {
     message: "The spool status was updated.",
   });
   revalidatePath("/filament");
-  revalidatePath("/dashboard");
 }
 
 export async function createMaintenanceLog(formData: FormData) {
@@ -1795,7 +1841,7 @@ export async function applyStagedImport(formData: FormData) {
     importJobId: job.id,
     entityType: job.entityType,
   });
-  revalidateInventory();
+  revalidateImportApply(job.entityType);
   if (returnTo) {
     redirect(returnTo as Parameters<typeof redirect>[0]);
   }
@@ -1856,7 +1902,15 @@ export async function applyAllStagedImports(formData: FormData) {
     appliedJobs: appliedJobs.length,
     entityTypes: appliedJobs.map((job) => job.entityType),
   });
-  revalidateInventory();
+  revalidatePaths([
+    "/imports",
+    "/audit",
+    "/dashboard",
+    ...appliedJobs.flatMap((job) => {
+      const kind = inventoryKindForImportEntityType(job.entityType);
+      return kind ? inventoryPathsForKind(kind) : [];
+    }),
+  ]);
   if (returnTo) {
     redirect(returnTo as Parameters<typeof redirect>[0]);
   }
