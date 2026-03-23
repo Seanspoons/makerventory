@@ -1,6 +1,14 @@
 const VERSION = "makerventory-v1";
 const STATIC_CACHE = `${VERSION}-static`;
-const STATIC_ASSETS = ["/manifest.webmanifest", "/pwa-192.png", "/pwa-512.png", "/pwa-maskable-512.png", "/favicon.svg", "/favicon.png"];
+const STATIC_ASSETS = [
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+  "/apple-touch-icon.png",
+  "/favicon.svg",
+  "/favicon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

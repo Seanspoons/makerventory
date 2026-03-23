@@ -145,9 +145,10 @@ The service worker only caches safe static assets such as icons, scripts, styles
 
 Current PWA icon assets:
 
-- `public/pwa-192.png`
-- `public/pwa-512.png`
-- `public/pwa-maskable-512.png`
+- `public/icon-192.png`
+- `public/icon-512.png`
+- `public/icon-maskable-512.png`
+- `public/apple-touch-icon.png`
 
 Best-practice icon set to provide later if you want the most polished install experience:
 
@@ -156,7 +157,7 @@ Best-practice icon set to provide later if you want the most polished install ex
 - `512x512` maskable PNG icon with extra padding for Android launchers
 - `180x180` Apple touch icon
 
-The current setup uses existing Makerventory mark assets as the source for those icons.
+The current setup now points at the dedicated named icon set above.
 
 ## Required Services For Hosted Deployment
 
