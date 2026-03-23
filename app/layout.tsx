@@ -1,11 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PwaRegistrar } from "@/components/pwa/pwa-registrar";
 import { ToastViewport } from "@/components/ui/toast";
 import { readFlashMessage } from "@/lib/flash";
 
 export const metadata: Metadata = {
   title: "Makerventory",
   description: "3D Printing Inventory and Operations Manager",
+  manifest: "/manifest.webmanifest",
+  applicationName: "Makerventory",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Makerventory",
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -15,6 +23,10 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
     apple: "/apple-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#020617",
 };
 
 export default async function RootLayout({
@@ -27,6 +39,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
+        <PwaRegistrar />
         <ToastViewport flash={flash} />
         {children}
       </body>

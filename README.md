@@ -133,6 +133,31 @@ Notes:
 - the production image uses `next start`, not the dev server.
 - the existing `Dockerfile` and `docker-compose.yml` remain dev-oriented on purpose.
 
+## PWA Support
+
+Makerventory now includes a basic installable PWA path:
+
+- web app manifest via [manifest.ts](/Users/seanwotherspoon/GitHub/makerventory/app/manifest.ts)
+- service worker registration via [pwa-registrar.tsx](/Users/seanwotherspoon/GitHub/makerventory/components/pwa/pwa-registrar.tsx)
+- a minimal service worker in [sw.js](/Users/seanwotherspoon/GitHub/makerventory/public/sw.js)
+
+The service worker only caches safe static assets such as icons, scripts, styles, and the manifest. It does not cache authenticated HTML pages or protected data responses.
+
+Current PWA icon assets:
+
+- `public/pwa-192.png`
+- `public/pwa-512.png`
+- `public/pwa-maskable-512.png`
+
+Best-practice icon set to provide later if you want the most polished install experience:
+
+- `192x192` PNG app icon
+- `512x512` PNG app icon
+- `512x512` maskable PNG icon with extra padding for Android launchers
+- `180x180` Apple touch icon
+
+The current setup uses existing Makerventory mark assets as the source for those icons.
+
 ## Required Services For Hosted Deployment
 
 Recommended hosted stack:
