@@ -1485,9 +1485,6 @@ export async function archiveInventoryItem(formData: FormData) {
 
 export async function updateFilamentState(formData: FormData) {
   const id = requiredString(formData, "id");
-  const opened = formData.get("opened") === "true";
-  const nearlyEmpty = formData.get("nearlyEmpty") === "true";
-  const estimatedRemainingGrams = numberValue(formData, "estimatedRemainingGrams", 0);
   const { userId, workspaceId } = await getWorkspaceContext();
   const owned = await assertOwnedRecord("filament", id, workspaceId);
 
@@ -1495,13 +1492,66 @@ export async function updateFilamentState(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  const current = await prisma.filamentSpool.findFirst({
+    where: { id, workspaceId },
+    select: {
+      opened: true,
+      nearlyEmpty: true,
+      estimatedRemainingGrams: true,
+      spoolWeightGrams: true,
+      status: true,
+    },
+  });
+
+  if (!current) {
+    throw new Error("Filament record not found");
+  }
+
+  const openedValue = formData.get("opened");
+  const nearlyEmptyValue = formData.get("nearlyEmpty");
+  const gramsUsedRaw = formData.get("gramsUsed");
+  const setToFull = formData.get("setToFull") === "true";
+
+  const opened =
+    typeof openedValue === "string"
+      ? openedValue === "true"
+      : current.opened;
+  const currentRemaining = current.estimatedRemainingGrams ?? current.spoolWeightGrams ?? 1000;
+  let estimatedRemainingGrams =
+    typeof formData.get("estimatedRemainingGrams") === "string"
+      ? numberValue(formData, "estimatedRemainingGrams", currentRemaining)
+      : currentRemaining;
+
+  if (typeof gramsUsedRaw === "string" && gramsUsedRaw.trim().length > 0) {
+    estimatedRemainingGrams = Math.max(
+      0,
+      currentRemaining - Math.max(0, Number(gramsUsedRaw) || 0),
+    );
+  } else if (setToFull) {
+    estimatedRemainingGrams = current.spoolWeightGrams ?? 1000;
+  }
+
+  const autoNearlyEmpty = estimatedRemainingGrams <= 150;
+  const nearlyEmpty =
+    typeof nearlyEmptyValue === "string"
+      ? nearlyEmptyValue === "true"
+      : autoNearlyEmpty || current.nearlyEmpty;
+  const nextStatus =
+    current.status === StockStatus.ARCHIVED
+      ? StockStatus.ARCHIVED
+      : estimatedRemainingGrams <= 0
+        ? StockStatus.OUT
+        : estimatedRemainingGrams <= 250 || nearlyEmpty
+          ? StockStatus.LOW
+          : StockStatus.HEALTHY;
+
   await prisma.filamentSpool.update({
     where: { id },
     data: {
       opened,
       nearlyEmpty,
       estimatedRemainingGrams,
-      status: estimatedRemainingGrams <= 250 ? StockStatus.LOW : StockStatus.HEALTHY,
+      status: nextStatus,
     },
   });
 
@@ -1516,6 +1566,11 @@ export async function updateFilamentState(formData: FormData) {
       opened,
       nearlyEmpty,
       estimatedRemainingGrams,
+      gramsUsed:
+        typeof gramsUsedRaw === "string" && gramsUsedRaw.trim().length > 0
+          ? Math.max(0, Number(gramsUsedRaw) || 0)
+          : null,
+      setToFull,
     },
   });
 
