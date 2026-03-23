@@ -30,7 +30,13 @@ export function MobileNav({
         <BrandLockup theme="dark" size="compact" subtitle={workspaceName} />
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild type="button" variant="secondary" size="sm" className="shrink-0">
+          <Button
+            asChild
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-9 shrink-0"
+          >
             <Link href="/search">
               <Search className="h-4 w-4" />
               Search
@@ -39,12 +45,15 @@ export function MobileNav({
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button type="button" variant="secondary" size="sm" className="shrink-0">
+              <Button type="button" variant="secondary" size="sm" className="h-9 shrink-0">
                 <Menu className="h-4 w-4" />
                 Menu
               </Button>
             </DialogTrigger>
-            <DialogContent className="left-auto right-2 top-2 w-[calc(100vw-1rem)] max-w-sm translate-x-0 translate-y-0 rounded-[28px] p-0 sm:right-4 sm:top-4 sm:w-[calc(100vw-2rem)]">
+            <DialogContent
+              showClose={false}
+              className="w-[calc(100vw-1rem)] max-w-sm rounded-[28px] border-none bg-transparent p-0 shadow-none sm:w-[calc(100vw-2rem)]"
+            >
               <div className="rounded-[28px] bg-slate-950 p-5 text-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -86,7 +95,14 @@ export function MobileNav({
                                     active ? "!text-slate-950" : "text-slate-400",
                                   )}
                                 />
-                                <span className="break-words">{item.label}</span>
+                                <span
+                                  className={cn(
+                                    "break-words",
+                                    active ? "!text-slate-950" : "text-inherit",
+                                  )}
+                                >
+                                  {item.label}
+                                </span>
                               </Link>
                             </DialogClose>
                           );

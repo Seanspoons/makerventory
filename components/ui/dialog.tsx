@@ -15,7 +15,7 @@ export const DialogOverlay = ({
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>) => (
   <DialogPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm",
+      "dialog-overlay-motion fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm",
       className,
     )}
     {...props}
@@ -25,22 +25,27 @@ export const DialogOverlay = ({
 export const DialogContent = ({
   className,
   children,
+  showClose = true,
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  showClose?: boolean;
+}) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_32px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:p-6",
+        "dialog-content-motion fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_32px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:p-6",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {showClose ? (
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      ) : null}
     </DialogPrimitive.Content>
   </DialogPortal>
 );
