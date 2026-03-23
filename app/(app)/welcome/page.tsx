@@ -137,7 +137,9 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
               <Textarea name="notes" placeholder="Optional workshop notes" />
             </LabeledField>
             <div className="lg:col-span-2">
-              <SubmitButton>Add first printer</SubmitButton>
+              <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-white">
+                Add first printer
+              </SubmitButton>
             </div>
           </form>
         </SectionCard>
@@ -172,7 +174,7 @@ export default async function WelcomePage(props: { searchParams?: SearchParams }
               <Textarea name="notes" placeholder="Optional stock note" />
             </LabeledField>
             <div className="lg:col-span-2">
-              <SubmitButton>
+              <SubmitButton className="!bg-slate-950 !text-white hover:!bg-slate-800 [&_svg]:!text-white">
                 <PackagePlus className="mr-2 h-4 w-4" />
                 Add first filament
               </SubmitButton>
