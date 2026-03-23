@@ -139,7 +139,7 @@ export default async function DashboardPage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild variant="secondary">
+                <Button asChild variant="secondary" className="!text-slate-950 [&_svg]:!text-slate-950">
                   <Link href={hasInventory ? "/filament" : "/welcome?step=printer"}>
                     {hasInventory ? "Add stock" : "Add first printer"}
                   </Link>
