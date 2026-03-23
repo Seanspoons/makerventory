@@ -94,7 +94,7 @@ export default async function AppLayout({
   const dailyFocus = await getDailyFocus(session.user.workspaceId);
 
   return (
-    <div className="app-shell-grid min-h-screen p-1.5 sm:p-4 lg:p-5">
+    <div className="app-shell-grid min-h-screen px-2.5 py-1.5 sm:p-4 lg:p-5">
       <div className="mx-auto grid max-w-[1600px] gap-3 sm:gap-5 lg:min-h-[calc(100vh-2.5rem)] lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="hidden lg:sticky lg:top-5 lg:block lg:h-[calc(100vh-2.5rem)] lg:min-h-0">
           <AppSidebar
