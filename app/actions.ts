@@ -383,6 +383,36 @@ async function logAuditEvent(args: {
   });
 }
 
+async function writeMutationFeedback(args: {
+  workspaceId: string;
+  userId?: string | null;
+  actionType: "CREATE" | "UPDATE" | "ARCHIVE" | "VOID" | "IMPORT_STAGE" | "IMPORT_APPLY";
+  entityType: string;
+  entityId?: string | null;
+  entityLabel?: string | null;
+  summary: string;
+  metadata?: Prisma.InputJsonValue;
+  flash: {
+    type: "success" | "error";
+    title: string;
+    message?: string;
+  };
+}) {
+  await Promise.all([
+    logAuditEvent({
+      workspaceId: args.workspaceId,
+      userId: args.userId,
+      actionType: args.actionType,
+      entityType: args.entityType,
+      entityId: args.entityId,
+      entityLabel: args.entityLabel,
+      summary: args.summary,
+      metadata: args.metadata,
+    }),
+    setFlashMessage(args.flash),
+  ]);
+}
+
 async function assertOwnedRecord(kind: string, id: string, workspaceId: string) {
   switch (kind) {
     case "printer":
@@ -659,7 +689,7 @@ export async function createInventoryItem(formData: FormData) {
       throw new Error(`Unsupported inventory kind: ${kind}`);
   }
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "CREATE",
@@ -667,12 +697,11 @@ export async function createInventoryItem(formData: FormData) {
     entityId: createdId,
     entityLabel: createdLabel,
     summary: `Created ${kind} record${createdLabel ? `: ${createdLabel}` : ""}.`,
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Record created",
-    message: "The inventory record was added successfully.",
+    flash: {
+      type: "success",
+      title: "Record created",
+      message: "The inventory record was added successfully.",
+    },
   });
   revalidateInventoryKind(kind);
   if (returnTo) {
@@ -1118,7 +1147,7 @@ export async function updateInventoryItem(formData: FormData) {
     optionalString(formData, "name") ??
     (updatedLabelParts.length > 0 ? updatedLabelParts.join(" ") : id);
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "UPDATE",
@@ -1126,12 +1155,11 @@ export async function updateInventoryItem(formData: FormData) {
     entityId: id,
     entityLabel: updatedLabel,
     summary: `Updated ${kind} record${updatedLabel ? `: ${updatedLabel}` : ""}.`,
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Record updated",
-    message: "Your changes were saved successfully.",
+    flash: {
+      type: "success",
+      title: "Record updated",
+      message: "Your changes were saved successfully.",
+    },
   });
   revalidateInventoryKind(kind);
 }
@@ -1620,7 +1648,7 @@ export async function archiveInventoryItem(formData: FormData) {
       throw new Error(`Unsupported archive kind: ${kind}`);
   }
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: kind === "maintenance" ? "VOID" : "ARCHIVE",
@@ -1630,12 +1658,11 @@ export async function archiveInventoryItem(formData: FormData) {
       kind === "maintenance"
         ? "Voided maintenance log entry."
         : `Archived ${kind} record.`,
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Record updated",
-    message: "The selected record was updated successfully.",
+    flash: {
+      type: "success",
+      title: "Record updated",
+      message: "The selected record was updated successfully.",
+    },
   });
   revalidateInventoryKind(kind);
 }
@@ -1727,7 +1754,7 @@ export async function updateFilamentState(formData: FormData) {
     },
   });
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "UPDATE",
@@ -1744,12 +1771,11 @@ export async function updateFilamentState(formData: FormData) {
           : null,
       setToFull,
     },
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Filament state updated",
-    message: "The spool status was updated.",
+    flash: {
+      type: "success",
+      title: "Filament state updated",
+      message: "The spool status was updated.",
+    },
   });
   revalidatePath("/filament");
 }
@@ -1777,7 +1803,7 @@ export async function createMaintenanceLog(formData: FormData) {
     },
   });
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "CREATE",
@@ -1790,12 +1816,11 @@ export async function createMaintenanceLog(formData: FormData) {
       assetId,
       actionType: data.actionType,
     },
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Maintenance logged",
-    message: "The maintenance event was recorded successfully.",
+    flash: {
+      type: "success",
+      title: "Maintenance logged",
+      message: "The maintenance event was recorded successfully.",
+    },
   });
   revalidatePath("/maintenance");
   revalidatePath("/dashboard");
@@ -1943,7 +1968,7 @@ export async function applyStagedImport(formData: FormData) {
 
   const job = await applyImportJobRows(jobId, workspaceId);
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "IMPORT_APPLY",
@@ -1954,12 +1979,11 @@ export async function applyStagedImport(formData: FormData) {
     metadata: {
       appliedAt: job.appliedAt?.toISOString() ?? null,
     },
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Import applied",
-    message: `${formatEntityName(job.entityType)} records were written to inventory.`,
+    flash: {
+      type: "success",
+      title: "Import applied",
+      message: `${formatEntityName(job.entityType)} records were written to inventory.`,
+    },
   });
   logInfo("imports.apply_succeeded", {
     ...logContext,
@@ -2002,7 +2026,7 @@ export async function applyAllStagedImports(formData: FormData) {
     appliedJobs.push(appliedJob);
   }
 
-  await logAuditEvent({
+  await writeMutationFeedback({
     workspaceId,
     userId,
     actionType: "IMPORT_APPLY",
@@ -2015,12 +2039,11 @@ export async function applyAllStagedImports(formData: FormData) {
         sourceName: job.sourceName,
       })),
     },
-  });
-
-  await setFlashMessage({
-    type: "success",
-    title: "Staged imports applied",
-    message: `${appliedJobs.length} staged import job(s) were applied to inventory.`,
+    flash: {
+      type: "success",
+      title: "Staged imports applied",
+      message: `${appliedJobs.length} staged import job(s) were applied to inventory.`,
+    },
   });
   logInfo("imports.apply_all_succeeded", {
     ...logContext,
