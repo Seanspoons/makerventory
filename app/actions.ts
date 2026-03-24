@@ -200,18 +200,47 @@ async function setPrinterSmartPlug(
   });
 }
 
+async function syncHotendDerivedStatus(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  hotendId: string,
+) {
+  const [assignedPrinter, hotend] = await Promise.all([
+    tx.printer.findFirst({
+      where: { workspaceId, installedHotendId: hotendId },
+      select: { id: true },
+    }),
+    tx.hotend.findFirst({
+      where: { id: hotendId, workspaceId },
+      select: { quantity: true, status: true },
+    }),
+  ]);
+
+  if (!hotend) {
+    return;
+  }
+
+  const nextStatus = deriveHotendStatus({
+    quantity: hotend.quantity,
+    installedPrinterId: assignedPrinter?.id ?? null,
+    persistedStatus: hotend.status,
+  });
+
+  if (nextStatus !== hotend.status) {
+    await tx.hotend.update({
+      where: { id: hotendId },
+      data: { status: nextStatus },
+    });
+  }
+}
+
 async function setPrinterInstalledHotend(
   tx: Prisma.TransactionClient,
   workspaceId: string,
   printerId: string,
   hotendId: string | null,
+  previousHotendId: string | null,
 ) {
-  const currentPrinter = await tx.printer.findFirst({
-    where: { id: printerId, workspaceId },
-    select: { installedHotendId: true },
-  });
-  const previousHotendId = currentPrinter?.installedHotendId ?? null;
-
   if (hotendId) {
     await tx.printer.updateMany({
       where: { workspaceId, installedHotendId: hotendId, id: { not: printerId } },
@@ -225,26 +254,40 @@ async function setPrinterInstalledHotend(
   });
 
   for (const candidateId of new Set([previousHotendId, hotendId].filter((value): value is string => Boolean(value)))) {
-    const assignedCount = await tx.printer.count({
-      where: { workspaceId, installedHotendId: candidateId },
-    });
-    const hotend = await tx.hotend.findFirst({
-      where: { id: candidateId, workspaceId },
-      select: { quantity: true, status: true },
-    });
+    await syncHotendDerivedStatus(tx, workspaceId, candidateId);
+  }
+}
 
-    if (hotend) {
-      await tx.hotend.update({
-        where: { id: candidateId },
-        data: {
-          status: deriveHotendStatus({
-            quantity: hotend.quantity,
-            installedPrinterId: assignedCount > 0 ? "assigned" : null,
-            persistedStatus: hotend.status,
-          }),
-        },
-      });
-    }
+async function syncBuildPlateDerivedStatus(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  buildPlateId: string,
+) {
+  const [assignedPrinter, plate] = await Promise.all([
+    tx.printer.findFirst({
+      where: { workspaceId, installedPlateId: buildPlateId },
+      select: { id: true },
+    }),
+    tx.buildPlate.findFirst({
+      where: { id: buildPlateId, workspaceId },
+      select: { status: true },
+    }),
+  ]);
+
+  if (!plate || plate.status === "RETIRED" || plate.status === "WORN") {
+    return;
+  }
+
+  const nextStatus = deriveBuildPlateStatus({
+    installedPrinterId: assignedPrinter?.id ?? null,
+    persistedStatus: plate.status,
+  });
+
+  if (nextStatus !== plate.status) {
+    await tx.buildPlate.update({
+      where: { id: buildPlateId },
+      data: { status: nextStatus },
+    });
   }
 }
 
@@ -253,13 +296,8 @@ async function setPrinterInstalledPlate(
   workspaceId: string,
   printerId: string,
   buildPlateId: string | null,
+  previousPlateId: string | null,
 ) {
-  const currentPrinter = await tx.printer.findFirst({
-    where: { id: printerId, workspaceId },
-    select: { installedPlateId: true },
-  });
-  const previousPlateId = currentPrinter?.installedPlateId ?? null;
-
   if (buildPlateId) {
     await tx.printer.updateMany({
       where: { workspaceId, installedPlateId: buildPlateId, id: { not: printerId } },
@@ -273,25 +311,7 @@ async function setPrinterInstalledPlate(
   });
 
   for (const candidateId of new Set([previousPlateId, buildPlateId].filter((value): value is string => Boolean(value)))) {
-    const assignedCount = await tx.printer.count({
-      where: { workspaceId, installedPlateId: candidateId },
-    });
-    const plate = await tx.buildPlate.findFirst({
-      where: { id: candidateId, workspaceId },
-      select: { status: true },
-    });
-
-    if (plate && plate.status !== "RETIRED" && plate.status !== "WORN") {
-      await tx.buildPlate.update({
-        where: { id: candidateId },
-        data: {
-          status: deriveBuildPlateStatus({
-            installedPrinterId: assignedCount > 0 ? "assigned" : null,
-            persistedStatus: plate.status,
-          }),
-        },
-      });
-    }
+    await syncBuildPlateDerivedStatus(tx, workspaceId, candidateId);
   }
 }
 
@@ -804,6 +824,13 @@ export async function updateInventoryItem(formData: FormData) {
   switch (kind) {
     case "printer":
       await prisma.$transaction(async (tx) => {
+        const currentPrinter = await tx.printer.findFirst({
+          where: { id, workspaceId },
+          select: {
+            installedHotendId: true,
+            installedPlateId: true,
+          },
+        });
         const printer = await tx.printer.update({
           where: { id },
           data: {
@@ -824,8 +851,20 @@ export async function updateInventoryItem(formData: FormData) {
         });
 
         await setPrinterSmartPlug(tx, workspaceId, printer.id, optionalString(formData, "smartPlugId"));
-        await setPrinterInstalledHotend(tx, workspaceId, printer.id, optionalString(formData, "installedHotendId"));
-        await setPrinterInstalledPlate(tx, workspaceId, printer.id, optionalString(formData, "installedPlateId"));
+        await setPrinterInstalledHotend(
+          tx,
+          workspaceId,
+          printer.id,
+          optionalString(formData, "installedHotendId"),
+          currentPrinter?.installedHotendId ?? null,
+        );
+        await setPrinterInstalledPlate(
+          tx,
+          workspaceId,
+          printer.id,
+          optionalString(formData, "installedPlateId"),
+          currentPrinter?.installedPlateId ?? null,
+        );
         await setPrinterMaterialSystems(tx, workspaceId, printer.id, selectedIds(formData, "materialSystemIds"));
       });
       break;
@@ -867,12 +906,23 @@ export async function updateInventoryItem(formData: FormData) {
 
         const assignedPrinterId = optionalString(formData, "assignedPrinterId");
         if (assignedPrinterId) {
-          await setPrinterInstalledPlate(tx, workspaceId, assignedPrinterId, id);
+          const currentPrinter = await tx.printer.findFirst({
+            where: { id: assignedPrinterId, workspaceId },
+            select: { installedPlateId: true },
+          });
+          await setPrinterInstalledPlate(
+            tx,
+            workspaceId,
+            assignedPrinterId,
+            id,
+            currentPrinter?.installedPlateId ?? null,
+          );
         } else {
           await tx.printer.updateMany({
             where: { workspaceId, installedPlateId: id },
             data: { installedPlateId: null },
           });
+          await syncBuildPlateDerivedStatus(tx, workspaceId, id);
         }
       });
       break;
@@ -893,18 +943,23 @@ export async function updateInventoryItem(formData: FormData) {
 
         const assignedPrinterId = optionalString(formData, "assignedPrinterId");
         if (assignedPrinterId) {
-          await setPrinterInstalledHotend(tx, workspaceId, assignedPrinterId, id);
+          const currentPrinter = await tx.printer.findFirst({
+            where: { id: assignedPrinterId, workspaceId },
+            select: { installedHotendId: true },
+          });
+          await setPrinterInstalledHotend(
+            tx,
+            workspaceId,
+            assignedPrinterId,
+            id,
+            currentPrinter?.installedHotendId ?? null,
+          );
         } else {
           await tx.printer.updateMany({
             where: { workspaceId, installedHotendId: id },
             data: { installedHotendId: null },
           });
-          await tx.hotend.update({
-            where: { id },
-            data: {
-              status: quantity <= 1 ? "LOW_STOCK" : "AVAILABLE",
-            },
-          });
+          await syncHotendDerivedStatus(tx, workspaceId, id);
         }
       });
       break;
