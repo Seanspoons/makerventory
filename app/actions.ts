@@ -76,6 +76,16 @@ function numberValue(formData: FormData, key: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function optionalDateValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function revalidatePaths(paths: string[]) {
   for (const path of new Set(paths)) {
     revalidatePath(path);
@@ -854,53 +864,78 @@ export async function updateInventoryItem(formData: FormData) {
       });
       break;
     case "filament":
-      await prisma.filamentSpool.update({
-        where: { id },
-        data: {
-          brand: requiredString(formData, "brand"),
-          materialType: requiredString(formData, "materialType"),
-          subtype: optionalString(formData, "subtype"),
-          finish: optionalString(formData, "finish"),
-          color: requiredString(formData, "color"),
-          quantity: numberValue(formData, "quantity", 1),
-          estimatedRemainingGrams: numberValue(formData, "estimatedRemainingGrams", 1000),
-          storageLocation: optionalString(formData, "storageLocation"),
-          status: requiredString(formData, "status") as
-            | "HEALTHY"
-            | "LOW"
-            | "OUT"
-            | "ARCHIVED",
-          opened: booleanValue(formData, "opened"),
-          nearlyEmpty: booleanValue(formData, "nearlyEmpty"),
-          abrasive: booleanValue(formData, "abrasive"),
-          dryingRequired: booleanValue(formData, "dryingRequired"),
-          hygroscopicLevel:
-            (optionalString(formData, "hygroscopicLevel") as FilamentHygroscopicLevel | null) ??
-            null,
-          compatibilityTags: booleanValue(formData, "abrasive")
-            ? ["Abrasive", "Hardened Nozzle"]
-            : booleanValue(formData, "dryingRequired")
-              ? ["Dryer Recommended"]
-              : ["General Purpose"],
-          notes: optionalString(formData, "notes"),
-          filamentRecommendation: {
-            upsert: {
-              create: {
-                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
-                dryerSuggested: booleanValue(formData, "dryerSuggested"),
-                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
-                notes: optionalString(formData, "recommendationNotes"),
-              },
-              update: {
-                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
-                dryerSuggested: booleanValue(formData, "dryerSuggested"),
-                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
-                notes: optionalString(formData, "recommendationNotes"),
+      {
+        const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
+        const currentRecord = await prisma.filamentSpool.findFirst({
+          where: { id, workspaceId },
+          select: { updatedAt: true },
+        });
+
+        if (!currentRecord) {
+          throw new Error("Filament record not found");
+        }
+
+        if (
+          expectedUpdatedAt &&
+          currentRecord.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+        ) {
+          await setFlashMessage({
+            type: "error",
+            title: "Filament changed while you were editing",
+            message: "Refresh the filament page and reapply your edit so nothing newer gets overwritten.",
+          });
+          revalidatePath("/filament");
+          return;
+        }
+
+        await prisma.filamentSpool.update({
+          where: { id },
+          data: {
+            brand: requiredString(formData, "brand"),
+            materialType: requiredString(formData, "materialType"),
+            subtype: optionalString(formData, "subtype"),
+            finish: optionalString(formData, "finish"),
+            color: requiredString(formData, "color"),
+            quantity: numberValue(formData, "quantity", 1),
+            estimatedRemainingGrams: numberValue(formData, "estimatedRemainingGrams", 1000),
+            storageLocation: optionalString(formData, "storageLocation"),
+            status: requiredString(formData, "status") as
+              | "HEALTHY"
+              | "LOW"
+              | "OUT"
+              | "ARCHIVED",
+            opened: booleanValue(formData, "opened"),
+            nearlyEmpty: booleanValue(formData, "nearlyEmpty"),
+            abrasive: booleanValue(formData, "abrasive"),
+            dryingRequired: booleanValue(formData, "dryingRequired"),
+            hygroscopicLevel:
+              (optionalString(formData, "hygroscopicLevel") as FilamentHygroscopicLevel | null) ??
+              null,
+            compatibilityTags: booleanValue(formData, "abrasive")
+              ? ["Abrasive", "Hardened Nozzle"]
+              : booleanValue(formData, "dryingRequired")
+                ? ["Dryer Recommended"]
+                : ["General Purpose"],
+            notes: optionalString(formData, "notes"),
+            filamentRecommendation: {
+              upsert: {
+                create: {
+                  recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                  dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                  hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                  notes: optionalString(formData, "recommendationNotes"),
+                },
+                update: {
+                  recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                  dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                  hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                  notes: optionalString(formData, "recommendationNotes"),
+                },
               },
             },
           },
-        },
-      });
+        });
+      }
       break;
     case "consumable":
       {
@@ -1547,6 +1582,7 @@ export async function updateFilamentState(formData: FormData) {
       estimatedRemainingGrams: true,
       spoolWeightGrams: true,
       status: true,
+      updatedAt: true,
     },
   });
 
@@ -1554,15 +1590,28 @@ export async function updateFilamentState(formData: FormData) {
     throw new Error("Filament record not found");
   }
 
-  const openedValue = formData.get("opened");
-  const nearlyEmptyValue = formData.get("nearlyEmpty");
+  const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
   const gramsUsedRaw = formData.get("gramsUsed");
   const setToFull = formData.get("setToFull") === "true";
+  const toggleOpened = formData.get("toggleOpened") === "true";
+  const toggleNearlyEmpty = formData.get("toggleNearlyEmpty") === "true";
+  const markOpened = formData.get("markOpened") === "true";
+  const clearNearlyEmpty = formData.get("clearNearlyEmpty") === "true";
 
-  const opened =
-    typeof openedValue === "string"
-      ? openedValue === "true"
-      : current.opened;
+  if (
+    expectedUpdatedAt &&
+    current.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+  ) {
+    await setFlashMessage({
+      type: "error",
+      title: "Filament view was out of date",
+      message: "Refresh the filament page before applying another quick change so the latest state stays intact.",
+    });
+    revalidatePath("/filament");
+    return;
+  }
+
+  const opened = toggleOpened ? !current.opened : markOpened ? true : current.opened;
   const currentRemaining = current.estimatedRemainingGrams ?? current.spoolWeightGrams ?? 1000;
   let estimatedRemainingGrams =
     typeof formData.get("estimatedRemainingGrams") === "string"
@@ -1579,9 +1628,10 @@ export async function updateFilamentState(formData: FormData) {
   }
 
   const autoNearlyEmpty = estimatedRemainingGrams <= 150;
-  const nearlyEmpty =
-    typeof nearlyEmptyValue === "string"
-      ? nearlyEmptyValue === "true"
+  const nearlyEmpty = clearNearlyEmpty
+    ? false
+    : toggleNearlyEmpty
+      ? !current.nearlyEmpty
       : autoNearlyEmpty || current.nearlyEmpty;
   const nextStatus =
     current.status === StockStatus.ARCHIVED

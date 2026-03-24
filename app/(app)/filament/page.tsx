@@ -286,8 +286,9 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                             {[50, 100, 250].map((grams) => (
                               <form key={grams} action={updateFilamentState}>
                                 <input type="hidden" name="id" value={item.id} />
+                                <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
                                 <input type="hidden" name="gramsUsed" value={grams} />
-                                <input type="hidden" name="opened" value="true" />
+                                <input type="hidden" name="markOpened" value="true" />
                                 <SubmitButton variant="secondary" size="sm">
                                   Use {grams} g
                                 </SubmitButton>
@@ -295,9 +296,9 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                             ))}
                             <form action={updateFilamentState}>
                               <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
                               <input type="hidden" name="setToFull" value="true" />
-                              <input type="hidden" name="opened" value={String(item.opened)} />
-                              <input type="hidden" name="nearlyEmpty" value="false" />
+                              <input type="hidden" name="clearNearlyEmpty" value="true" />
                               <SubmitButton variant="secondary" size="sm">
                                 Reset to full spool
                               </SubmitButton>
@@ -317,7 +318,8 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                             </div>
                             <div className="flex items-end">
                               <input type="hidden" name="id" value={item.id} />
-                              <input type="hidden" name="opened" value="true" />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                              <input type="hidden" name="markOpened" value="true" />
                               <SubmitButton size="sm" className="w-full sm:w-auto">
                                 Log print usage
                               </SubmitButton>
@@ -328,17 +330,16 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                         <div className="flex flex-wrap gap-2 lg:max-w-[320px] lg:justify-end">
                           <form action={updateFilamentState}>
                             <input type="hidden" name="id" value={item.id} />
-                            <input type="hidden" name="opened" value={item.opened ? "false" : "true"} />
-                            <input type="hidden" name="nearlyEmpty" value={item.nearlyEmpty ? String(item.nearlyEmpty) : "false"} />
-                            <input type="hidden" name="estimatedRemainingGrams" value={item.estimatedRemainingGrams ?? 1000} />
+                            <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                            <input type="hidden" name="toggleOpened" value="true" />
                             <SubmitButton variant="secondary" size="sm">
                               {item.opened ? "Mark sealed" : "Mark opened"}
                             </SubmitButton>
                           </form>
                           <form action={updateFilamentState}>
                             <input type="hidden" name="id" value={item.id} />
-                            <input type="hidden" name="opened" value={String(item.opened)} />
-                            <input type="hidden" name="nearlyEmpty" value={item.nearlyEmpty ? "false" : "true"} />
+                            <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                            <input type="hidden" name="toggleNearlyEmpty" value="true" />
                             <input
                               type="hidden"
                               name="estimatedRemainingGrams"
@@ -360,6 +361,7 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                             <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                               <input type="hidden" name="kind" value="filament" />
                               <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
                               <LabeledField label="Brand">
                                 <Input name="brand" defaultValue={item.brand} required />
                               </LabeledField>
