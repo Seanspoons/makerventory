@@ -277,24 +277,29 @@ export default async function DashboardPage() {
               </Button>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {quickActions.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 transition hover:border-slate-300 hover:bg-white"
-                >
-                  <div className="flex items-center gap-2 text-slate-950">
-                    <Icon className="h-4 w-4" />
-                    <p className="font-medium">{item.label}</p>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
-                </Link>
-              );
-            })}
-          </div>
+          <details className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/70">
+            <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+              Other common actions
+            </summary>
+            <div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
+              {quickActions.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-2 text-slate-950">
+                      <Icon className="h-4 w-4" />
+                      <p className="font-medium">{item.label}</p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </details>
         </SectionCard>
 
         <SectionCard
@@ -405,22 +410,31 @@ export default async function DashboardPage() {
                 </p>
               </Link>
             ))}
-            {data.recentMaintenance.slice(0, 3).map((log) => (
-              <div key={log.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="break-words font-medium text-slate-950">{log.actionPerformed}</p>
-                  <StatusBadge value={log.actionType} />
+            {data.recentMaintenance.length > 0 ? (
+              <details className="rounded-[22px] border border-slate-200 bg-slate-50/70">
+                <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                  Recent maintenance activity
+                </summary>
+                <div className="space-y-3 border-t border-slate-200 p-4">
+                  {data.recentMaintenance.slice(0, 3).map((log) => (
+                    <div key={log.id} className="rounded-2xl border border-slate-100 bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="break-words font-medium text-slate-950">{log.actionPerformed}</p>
+                        <StatusBadge value={log.actionType} />
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        {log.printer?.name ??
+                          log.materialSystem?.name ??
+                          log.buildPlate?.name ??
+                          log.hotend?.name ??
+                          log.safetyEquipment?.name ??
+                          "Workshop asset"}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {log.printer?.name ??
-                    log.materialSystem?.name ??
-                    log.buildPlate?.name ??
-                    log.hotend?.name ??
-                    log.safetyEquipment?.name ??
-                    "Workshop asset"}
-                </p>
-              </div>
-            ))}
+              </details>
+            ) : null}
             {data.stagedImportJobs.length === 0 && data.recentMaintenance.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-500">
                 Once you start importing data and logging service actions, recent operational changes will show up here.
@@ -430,11 +444,11 @@ export default async function DashboardPage() {
         </SectionCard>
       </div>
 
-      <SectionCard
-        title="Material focus"
-        description="A lighter-weight view of current stock shape, with detail pages reserved for deeper review."
-      >
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <details className="rounded-[28px] border border-slate-200 bg-white">
+        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-slate-950">
+          Material focus
+        </summary>
+        <div className="grid gap-4 border-t border-slate-100 p-5 lg:grid-cols-[0.9fr_1.1fr] sm:p-6">
           <div className="space-y-4">
             {data.filamentByMaterial.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-500">
@@ -478,7 +492,7 @@ export default async function DashboardPage() {
             ) : null}
           </div>
         </div>
-      </SectionCard>
+      </details>
     </div>
   );
 }
