@@ -269,91 +269,7 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                           </div>
                         </div>
 
-                        <div className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="font-medium text-slate-950">Quick usage update</p>
-                              <p className="mt-1 text-sm leading-6 text-slate-500">
-                                Use this after a print to reduce remaining grams without opening the full edit form.
-                              </p>
-                            </div>
-                            <p className="text-sm font-medium text-slate-700">
-                              {item.estimatedRemainingGrams ?? 1000} g remaining
-                            </p>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {[50, 100, 250].map((grams) => (
-                              <form key={grams} action={updateFilamentState}>
-                                <input type="hidden" name="id" value={item.id} />
-                                <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
-                                <input type="hidden" name="gramsUsed" value={grams} />
-                                <input type="hidden" name="markOpened" value="true" />
-                                <SubmitButton variant="secondary" size="sm">
-                                  Use {grams} g
-                                </SubmitButton>
-                              </form>
-                            ))}
-                            <form action={updateFilamentState}>
-                              <input type="hidden" name="id" value={item.id} />
-                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
-                              <input type="hidden" name="setToFull" value="true" />
-                              <input type="hidden" name="clearNearlyEmpty" value="true" />
-                              <SubmitButton variant="secondary" size="sm">
-                                Reset to full spool
-                              </SubmitButton>
-                            </form>
-                          </div>
-
-                          <form action={updateFilamentState} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_auto]">
-                            <div>
-                              <label className="mb-2 block text-sm text-slate-500">Exact grams used</label>
-                              <Input
-                                name="gramsUsed"
-                                type="number"
-                                min="1"
-                                step="1"
-                                defaultValue="60"
-                              />
-                            </div>
-                            <div className="flex items-end">
-                              <input type="hidden" name="id" value={item.id} />
-                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
-                              <input type="hidden" name="markOpened" value="true" />
-                              <SubmitButton size="sm" className="w-full sm:w-auto">
-                                Log print usage
-                              </SubmitButton>
-                            </div>
-                          </form>
-                        </div>
-
                         <div className="flex flex-wrap gap-2 lg:max-w-[320px] lg:justify-end">
-                          <form action={updateFilamentState}>
-                            <input type="hidden" name="id" value={item.id} />
-                            <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
-                            <input type="hidden" name="toggleOpened" value="true" />
-                            <SubmitButton variant="secondary" size="sm">
-                              {item.opened ? "Mark sealed" : "Mark opened"}
-                            </SubmitButton>
-                          </form>
-                          <form action={updateFilamentState}>
-                            <input type="hidden" name="id" value={item.id} />
-                            <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
-                            <input type="hidden" name="toggleNearlyEmpty" value="true" />
-                            <input
-                              type="hidden"
-                              name="estimatedRemainingGrams"
-                              value={Math.max(
-                                0,
-                                item.nearlyEmpty
-                                  ? (item.estimatedRemainingGrams ?? 500) + 200
-                                  : (item.estimatedRemainingGrams ?? 500) - 200,
-                              )}
-                            />
-                            <SubmitButton variant="secondary" size="sm">
-                              {item.nearlyEmpty ? "Clear nearly empty" : "Mark nearly empty"}
-                            </SubmitButton>
-                          </form>
                           <EditDialog
                             title={`Edit ${item.brand} ${item.color} ${item.materialType}`}
                             description="Update stock, handling, and recommendation fields for this filament record."
@@ -466,6 +382,92 @@ export default async function FilamentPage(props: { searchParams?: SearchParams 
                           <ArchiveForm id={item.id} kind="filament" />
                         </div>
                       </div>
+
+                      <details className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50/80">
+                        <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                          Quick stock actions
+                        </summary>
+                        <div className="border-t border-slate-200 p-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-sm leading-6 text-slate-500">
+                              Use this after a print or stock check instead of opening the full edit form.
+                            </p>
+                            <p className="text-sm font-medium text-slate-700">
+                              {item.estimatedRemainingGrams ?? 1000} g remaining
+                            </p>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {[50, 100, 250].map((grams) => (
+                              <form key={grams} action={updateFilamentState}>
+                                <input type="hidden" name="id" value={item.id} />
+                                <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                                <input type="hidden" name="gramsUsed" value={grams} />
+                                <input type="hidden" name="markOpened" value="true" />
+                                <SubmitButton variant="secondary" size="sm">
+                                  Use {grams} g
+                                </SubmitButton>
+                              </form>
+                            ))}
+                            <form action={updateFilamentState}>
+                              <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                              <input type="hidden" name="setToFull" value="true" />
+                              <input type="hidden" name="clearNearlyEmpty" value="true" />
+                              <SubmitButton variant="secondary" size="sm">
+                                Reset to full spool
+                              </SubmitButton>
+                            </form>
+                            <form action={updateFilamentState}>
+                              <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                              <input type="hidden" name="toggleOpened" value="true" />
+                              <SubmitButton variant="secondary" size="sm">
+                                {item.opened ? "Mark sealed" : "Mark opened"}
+                              </SubmitButton>
+                            </form>
+                            <form action={updateFilamentState}>
+                              <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                              <input type="hidden" name="toggleNearlyEmpty" value="true" />
+                              <input
+                                type="hidden"
+                                name="estimatedRemainingGrams"
+                                value={Math.max(
+                                  0,
+                                  item.nearlyEmpty
+                                    ? (item.estimatedRemainingGrams ?? 500) + 200
+                                    : (item.estimatedRemainingGrams ?? 500) - 200,
+                                )}
+                              />
+                              <SubmitButton variant="secondary" size="sm">
+                                {item.nearlyEmpty ? "Clear nearly empty" : "Mark nearly empty"}
+                              </SubmitButton>
+                            </form>
+                          </div>
+
+                          <form action={updateFilamentState} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_auto]">
+                            <div>
+                              <label className="mb-2 block text-sm text-slate-500">Exact grams used</label>
+                              <Input
+                                name="gramsUsed"
+                                type="number"
+                                min="1"
+                                step="1"
+                                defaultValue="60"
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <input type="hidden" name="id" value={item.id} />
+                              <input type="hidden" name="currentUpdatedAt" value={item.updatedAt.toISOString()} />
+                              <input type="hidden" name="markOpened" value="true" />
+                              <SubmitButton size="sm" className="w-full sm:w-auto">
+                                Log print usage
+                              </SubmitButton>
+                            </div>
+                          </form>
+                        </div>
+                      </details>
 
                       <details className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50/80">
                         <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
