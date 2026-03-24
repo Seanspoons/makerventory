@@ -392,6 +392,33 @@ async function assertOwnedRecord(kind: string, id: string, workspaceId: string) 
   }
 }
 
+async function getRecordUpdatedAt(kind: string, id: string, workspaceId: string) {
+  switch (kind) {
+    case "printer":
+      return prisma.printer.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "material-system":
+      return prisma.materialSystem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "build-plate":
+      return prisma.buildPlate.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "hotend":
+      return prisma.hotend.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "filament":
+      return prisma.filamentSpool.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "consumable":
+      return prisma.consumableItem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "safety":
+      return prisma.safetyEquipment.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "smart-plug":
+      return prisma.smartPlug.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "tool":
+      return prisma.toolPart.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    case "wishlist":
+      return prisma.wishlistItem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+    default:
+      return null;
+  }
+}
+
 export async function createInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const { userId, workspaceId } = await getWorkspaceContext();
@@ -751,9 +778,27 @@ export async function updateInventoryItem(formData: FormData) {
   const id = requiredString(formData, "id");
   const { userId, workspaceId } = await getWorkspaceContext();
   const owned = await assertOwnedRecord(kind, id, workspaceId);
+  const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
 
   if (!owned) {
     throw new Error("Unauthorized");
+  }
+
+  if (expectedUpdatedAt) {
+    const currentRecord = await getRecordUpdatedAt(kind, id, workspaceId);
+    if (!currentRecord) {
+      throw new Error("Record not found");
+    }
+
+    if (currentRecord.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+      await setFlashMessage({
+        type: "error",
+        title: "This record changed while you were editing",
+        message: `Refresh the ${formatEntityName(kind).toLowerCase()} page and reapply your changes so nothing newer gets overwritten.`,
+      });
+      revalidateInventoryKind(kind);
+      return;
+    }
   }
 
   switch (kind) {
@@ -864,78 +909,53 @@ export async function updateInventoryItem(formData: FormData) {
       });
       break;
     case "filament":
-      {
-        const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
-        const currentRecord = await prisma.filamentSpool.findFirst({
-          where: { id, workspaceId },
-          select: { updatedAt: true },
-        });
-
-        if (!currentRecord) {
-          throw new Error("Filament record not found");
-        }
-
-        if (
-          expectedUpdatedAt &&
-          currentRecord.updatedAt.getTime() !== expectedUpdatedAt.getTime()
-        ) {
-          await setFlashMessage({
-            type: "error",
-            title: "Filament changed while you were editing",
-            message: "Refresh the filament page and reapply your edit so nothing newer gets overwritten.",
-          });
-          revalidatePath("/filament");
-          return;
-        }
-
-        await prisma.filamentSpool.update({
-          where: { id },
-          data: {
-            brand: requiredString(formData, "brand"),
-            materialType: requiredString(formData, "materialType"),
-            subtype: optionalString(formData, "subtype"),
-            finish: optionalString(formData, "finish"),
-            color: requiredString(formData, "color"),
-            quantity: numberValue(formData, "quantity", 1),
-            estimatedRemainingGrams: numberValue(formData, "estimatedRemainingGrams", 1000),
-            storageLocation: optionalString(formData, "storageLocation"),
-            status: requiredString(formData, "status") as
-              | "HEALTHY"
-              | "LOW"
-              | "OUT"
-              | "ARCHIVED",
-            opened: booleanValue(formData, "opened"),
-            nearlyEmpty: booleanValue(formData, "nearlyEmpty"),
-            abrasive: booleanValue(formData, "abrasive"),
-            dryingRequired: booleanValue(formData, "dryingRequired"),
-            hygroscopicLevel:
-              (optionalString(formData, "hygroscopicLevel") as FilamentHygroscopicLevel | null) ??
-              null,
-            compatibilityTags: booleanValue(formData, "abrasive")
-              ? ["Abrasive", "Hardened Nozzle"]
-              : booleanValue(formData, "dryingRequired")
-                ? ["Dryer Recommended"]
-                : ["General Purpose"],
-            notes: optionalString(formData, "notes"),
-            filamentRecommendation: {
-              upsert: {
-                create: {
-                  recommendedNozzle: optionalString(formData, "recommendedNozzle"),
-                  dryerSuggested: booleanValue(formData, "dryerSuggested"),
-                  hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
-                  notes: optionalString(formData, "recommendationNotes"),
-                },
-                update: {
-                  recommendedNozzle: optionalString(formData, "recommendedNozzle"),
-                  dryerSuggested: booleanValue(formData, "dryerSuggested"),
-                  hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
-                  notes: optionalString(formData, "recommendationNotes"),
-                },
+      await prisma.filamentSpool.update({
+        where: { id },
+        data: {
+          brand: requiredString(formData, "brand"),
+          materialType: requiredString(formData, "materialType"),
+          subtype: optionalString(formData, "subtype"),
+          finish: optionalString(formData, "finish"),
+          color: requiredString(formData, "color"),
+          quantity: numberValue(formData, "quantity", 1),
+          estimatedRemainingGrams: numberValue(formData, "estimatedRemainingGrams", 1000),
+          storageLocation: optionalString(formData, "storageLocation"),
+          status: requiredString(formData, "status") as
+            | "HEALTHY"
+            | "LOW"
+            | "OUT"
+            | "ARCHIVED",
+          opened: booleanValue(formData, "opened"),
+          nearlyEmpty: booleanValue(formData, "nearlyEmpty"),
+          abrasive: booleanValue(formData, "abrasive"),
+          dryingRequired: booleanValue(formData, "dryingRequired"),
+          hygroscopicLevel:
+            (optionalString(formData, "hygroscopicLevel") as FilamentHygroscopicLevel | null) ??
+            null,
+          compatibilityTags: booleanValue(formData, "abrasive")
+            ? ["Abrasive", "Hardened Nozzle"]
+            : booleanValue(formData, "dryingRequired")
+              ? ["Dryer Recommended"]
+              : ["General Purpose"],
+          notes: optionalString(formData, "notes"),
+          filamentRecommendation: {
+            upsert: {
+              create: {
+                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                notes: optionalString(formData, "recommendationNotes"),
+              },
+              update: {
+                recommendedNozzle: optionalString(formData, "recommendedNozzle"),
+                dryerSuggested: booleanValue(formData, "dryerSuggested"),
+                hardenedNozzleNeeded: booleanValue(formData, "hardenedNozzleNeeded"),
+                notes: optionalString(formData, "recommendationNotes"),
               },
             },
           },
-        });
-      }
+        },
+      });
       break;
     case "consumable":
       {

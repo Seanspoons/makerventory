@@ -218,6 +218,7 @@ export default async function PrintersPage(props: { searchParams?: SearchParams 
                       <form action={updateInventoryItem} className="grid gap-4 lg:grid-cols-2">
                         <input type="hidden" name="kind" value="printer" />
                         <input type="hidden" name="id" value={detail.id} />
+                        <input type="hidden" name="currentUpdatedAt" value={detail.updatedAt.toISOString()} />
                         <LabeledField label="Name">
                           <Input name="name" defaultValue={detail.name} required />
                         </LabeledField>
