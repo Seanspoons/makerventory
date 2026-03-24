@@ -86,6 +86,8 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
   const selectedEntityType = importEntityOptions.some((option) => option.value === entityTypeParam)
     ? entityTypeParam
     : "FILAMENT";
+  const selectedImportOption =
+    importEntityOptions.find((option) => option.value === selectedEntityType) ?? importEntityOptions[0];
   const { jobs, selectedJob, selectedJobActivity } = await getImportJobs(selected);
   const selectedRowFilter = rowStatusFilters.some((filter) => filter.value === rowStatusParam)
     ? rowStatusParam
@@ -227,14 +229,34 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
             title="Stage CSV import"
             description="Upload a focused CSV, review the staged rows, and apply changes deliberately so your workshop data stays clean and organized."
           >
-          <div className="mb-5 flex flex-wrap gap-2">
-            {importEntityOptions.map((option) => (
-              <Button key={option.value} asChild variant="secondary" size="sm">
-                <Link href={`/api/import-templates/${option.value.toLowerCase()}`}>
-                  Download {option.label} template
+          <div className="mb-5 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium text-slate-950">Template for {selectedImportOption.label}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {selectedImportOption.description}
+                </p>
+              </div>
+              <Button asChild variant="secondary" size="sm">
+                <Link href={`/api/import-templates/${selectedImportOption.value.toLowerCase()}`}>
+                  Download template
                 </Link>
               </Button>
-            ))}
+            </div>
+            <details className="mt-4 rounded-[18px] border border-slate-200 bg-white">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-950">
+                Browse templates for other inventory types
+              </summary>
+              <div className="grid gap-2 border-t border-slate-100 p-4 sm:grid-cols-2">
+                {importEntityOptions.map((option) => (
+                  <Button key={option.value} asChild variant="secondary" size="sm" className="justify-start">
+                    <Link href={`/api/import-templates/${option.value.toLowerCase()}`}>
+                      {option.label}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+            </details>
           </div>
           <form action={stageImportJob} className="grid gap-4 lg:grid-cols-2">
             <div>
@@ -294,18 +316,36 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                 ))}
               </div>
             </div>
-            <div className="lg:col-span-2 grid gap-3 md:grid-cols-2">
-              {importEntityOptions.map((option) => (
-                <div
-                  key={option.value}
-                  className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4"
-                >
-                  <p className="font-medium text-slate-950">{option.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {option.description}
-                  </p>
+            <div className="lg:col-span-2 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <p className="font-medium text-slate-950">Selected inventory shape</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {selectedImportOption.label}: {selectedImportOption.description}
+              </p>
+              <details className="mt-4 rounded-[18px] border border-slate-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-950">
+                  Compare other supported inventory types
+                </summary>
+                <div className="grid gap-3 border-t border-slate-100 p-4 md:grid-cols-2">
+                  {importEntityOptions.map((option) => (
+                    <div
+                      key={option.value}
+                      className={cn(
+                        "rounded-[18px] border p-3",
+                        option.value === selectedImportOption.value
+                          ? "border-slate-900 bg-slate-950 text-white"
+                          : "border-slate-200 bg-slate-50/80",
+                      )}
+                    >
+                      <p className={cn("font-medium", option.value === selectedImportOption.value ? "text-white" : "text-slate-950")}>
+                        {option.label}
+                      </p>
+                      <p className={cn("mt-2 text-sm leading-6", option.value === selectedImportOption.value ? "text-slate-300" : "text-slate-600")}>
+                        {option.description}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </details>
             </div>
             <div className="lg:col-span-2">
               <SubmitButton>Stage import</SubmitButton>
