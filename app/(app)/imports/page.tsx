@@ -676,16 +676,11 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
               </div>
 
               {selectedJobActivity.length > 0 ? (
-                <div className="rounded-[22px] border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-slate-950">Job activity</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">
-                        Recent actions for this import job so you can see what changed and when.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-3">
+                <details className="rounded-[22px] border border-slate-200 bg-white">
+                  <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                    Job activity
+                  </summary>
+                  <div className="space-y-3 border-t border-slate-200 p-4">
                     {selectedJobActivity.slice(0, 6).map((event) => (
                       <div key={event.id} className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -698,31 +693,36 @@ export default async function ImportsPage(props: { searchParams?: SearchParams }
                       </div>
                     ))}
                   </div>
-                </div>
+                </details>
               ) : null}
 
-              <div className="flex flex-wrap gap-2">
-                {rowStatusFilters.map((filter) => {
-                  const href = selectedJob
-                    ? `/imports?selected=${selectedJob.id}&rowStatus=${filter.value}#staged-job`
-                    : `/imports?rowStatus=${filter.value}#staged-job`;
-                  const isActive = selectedRowFilter === filter.value;
+              <details className="rounded-[22px] border border-slate-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+                  Filter review rows
+                </summary>
+                <div className="flex flex-wrap gap-2 border-t border-slate-200 p-4">
+                  {rowStatusFilters.map((filter) => {
+                    const href = selectedJob
+                      ? `/imports?selected=${selectedJob.id}&rowStatus=${filter.value}#staged-job`
+                      : `/imports?rowStatus=${filter.value}#staged-job`;
+                    const isActive = selectedRowFilter === filter.value;
 
-                  return (
-                    <Button
-                      key={filter.value}
-                      asChild
-                      size="sm"
-                      variant={isActive ? "default" : "secondary"}
-                      className={cn("w-full sm:w-auto", isActive ? "!text-white [&_svg]:!text-white" : "")}
-                    >
-                      <Link href={href as Parameters<typeof Link>[0]["href"]}>
-                        {filter.label} ({countImportRowsByFilter(filter.value, selectedJob.rows)})
-                      </Link>
-                    </Button>
-                  );
-                })}
-              </div>
+                    return (
+                      <Button
+                        key={filter.value}
+                        asChild
+                        size="sm"
+                        variant={isActive ? "default" : "secondary"}
+                        className={cn("w-full sm:w-auto", isActive ? "!text-white [&_svg]:!text-white" : "")}
+                      >
+                        <Link href={href as Parameters<typeof Link>[0]["href"]}>
+                          {filter.label} ({countImportRowsByFilter(filter.value, selectedJob.rows)})
+                        </Link>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </details>
 
               <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600">
                 Showing {filteredRows.length} of {selectedJob.rows.length} row(s) in this staged job.

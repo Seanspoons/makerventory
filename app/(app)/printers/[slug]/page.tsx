@@ -77,6 +77,33 @@ export default async function PrinterDetailPage({
               }
             />
           </div>
+          <details className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/70">
+            <summary className="cursor-pointer list-none px-4 py-3 font-medium text-slate-950">
+              Compatibility reference
+            </summary>
+            <div className="grid gap-4 border-t border-slate-200 p-4 lg:grid-cols-3">
+              <div>
+                <p className="mb-3 text-sm font-medium text-slate-950">Build plates</p>
+                <List
+                  values={printer.compatiblePlates.map(
+                    (item) => `${item.buildPlate.name} · ${formatBuildPlateSize(item.buildPlate.sizeMm)}`,
+                  )}
+                />
+              </div>
+              <div>
+                <p className="mb-3 text-sm font-medium text-slate-950">Hotends</p>
+                <List values={printer.compatibleHotends.map((item) => item.hotend.name)} />
+              </div>
+              <div>
+                <p className="mb-3 text-sm font-medium text-slate-950">Material systems</p>
+                <List
+                  values={printer.compatibleMaterialSystems.map(
+                    (item) => `${item.materialSystem.name} (${formatMaterialSystemType(item.materialSystem.type)})`,
+                  )}
+                />
+              </div>
+            </div>
+          </details>
         </SectionCard>
 
         <SectionCard title="Maintenance history" description="Recent work performed on this machine.">
@@ -103,25 +130,6 @@ export default async function PrinterDetailPage({
         </SectionCard>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <SectionCard title="Compatible build plates" description="Only plates configured for this printer appear here.">
-          <List
-            values={printer.compatiblePlates.map(
-              (item) => `${item.buildPlate.name} · ${formatBuildPlateSize(item.buildPlate.sizeMm)}`,
-            )}
-          />
-        </SectionCard>
-        <SectionCard title="Compatible hotends" description="Hotends safe to install on this machine.">
-          <List values={printer.compatibleHotends.map((item) => item.hotend.name)} />
-        </SectionCard>
-        <SectionCard title="Compatible material systems" description="Linked and supported material flow hardware.">
-          <List
-            values={printer.compatibleMaterialSystems.map(
-              (item) => `${item.materialSystem.name} (${formatMaterialSystemType(item.materialSystem.type)})`,
-            )}
-          />
-        </SectionCard>
-      </div>
     </div>
   );
 }
