@@ -413,57 +413,30 @@ async function writeMutationFeedback(args: {
   ]);
 }
 
-async function assertOwnedRecord(kind: string, id: string, workspaceId: string) {
+async function getOwnedRecordSnapshot(kind: string, id: string, workspaceId: string) {
   switch (kind) {
     case "printer":
-      return prisma.printer.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.printer.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "material-system":
-      return prisma.materialSystem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.materialSystem.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "build-plate":
-      return prisma.buildPlate.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.buildPlate.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "hotend":
-      return prisma.hotend.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.hotend.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "filament":
-      return prisma.filamentSpool.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.filamentSpool.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "consumable":
-      return prisma.consumableItem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.consumableItem.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "safety":
-      return prisma.safetyEquipment.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.safetyEquipment.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "smart-plug":
-      return prisma.smartPlug.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.smartPlug.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "tool":
-      return prisma.toolPart.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.toolPart.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "wishlist":
-      return prisma.wishlistItem.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      return prisma.wishlistItem.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     case "maintenance":
-      return prisma.maintenanceLog.findFirst({ where: { id, workspaceId }, select: { id: true } });
-    default:
-      return null;
-  }
-}
-
-async function getRecordUpdatedAt(kind: string, id: string, workspaceId: string) {
-  switch (kind) {
-    case "printer":
-      return prisma.printer.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "material-system":
-      return prisma.materialSystem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "build-plate":
-      return prisma.buildPlate.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "hotend":
-      return prisma.hotend.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "filament":
-      return prisma.filamentSpool.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "consumable":
-      return prisma.consumableItem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "safety":
-      return prisma.safetyEquipment.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "smart-plug":
-      return prisma.smartPlug.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "tool":
-      return prisma.toolPart.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
-    case "wishlist":
-      return prisma.wishlistItem.findFirst({ where: { id, workspaceId }, select: { updatedAt: true } });
+      return prisma.maintenanceLog.findFirst({ where: { id, workspaceId }, select: { id: true, updatedAt: true } });
     default:
       return null;
   }
@@ -823,31 +796,25 @@ export async function signUpUser(formData: FormData) {
 }
 
 export async function updateInventoryItem(formData: FormData) {
+  const startedAt = Date.now();
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
   const { userId, workspaceId } = await getWorkspaceContext();
-  const owned = await assertOwnedRecord(kind, id, workspaceId);
+  const ownedRecord = await getOwnedRecordSnapshot(kind, id, workspaceId);
   const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
 
-  if (!owned) {
+  if (!ownedRecord) {
     throw new Error("Unauthorized");
   }
 
-  if (expectedUpdatedAt) {
-    const currentRecord = await getRecordUpdatedAt(kind, id, workspaceId);
-    if (!currentRecord) {
-      throw new Error("Record not found");
-    }
-
-    if (currentRecord.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
-      await setFlashMessage({
-        type: "error",
-        title: "This record changed while you were editing",
-        message: `Refresh the ${formatEntityName(kind).toLowerCase()} page and reapply your changes so nothing newer gets overwritten.`,
-      });
-      revalidateInventoryKind(kind);
-      return;
-    }
+  if (expectedUpdatedAt && ownedRecord.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+    await setFlashMessage({
+      type: "error",
+      title: "This record changed while you were editing",
+      message: `Refresh the ${formatEntityName(kind).toLowerCase()} page and reapply your changes so nothing newer gets overwritten.`,
+    });
+    revalidateInventoryKind(kind);
+    return;
   }
 
   switch (kind) {
@@ -1162,6 +1129,13 @@ export async function updateInventoryItem(formData: FormData) {
     },
   });
   revalidateInventoryKind(kind);
+  logInfo("mutations.inventory_update_succeeded", {
+    workspaceId,
+    userId,
+    kind,
+    entityId: id,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export async function updateAccountProfile(formData: FormData) {
@@ -1598,7 +1572,7 @@ export async function archiveInventoryItem(formData: FormData) {
   const kind = requiredString(formData, "kind");
   const id = requiredString(formData, "id");
   const { userId, workspaceId } = await getWorkspaceContext();
-  const owned = await assertOwnedRecord(kind, id, workspaceId);
+  const owned = await getOwnedRecordSnapshot(kind, id, workspaceId);
 
   if (!owned) {
     throw new Error("Unauthorized");
@@ -1668,13 +1642,9 @@ export async function archiveInventoryItem(formData: FormData) {
 }
 
 export async function updateFilamentState(formData: FormData) {
+  const startedAt = Date.now();
   const id = requiredString(formData, "id");
   const { userId, workspaceId } = await getWorkspaceContext();
-  const owned = await assertOwnedRecord("filament", id, workspaceId);
-
-  if (!owned) {
-    throw new Error("Unauthorized");
-  }
 
   const current = await prisma.filamentSpool.findFirst({
     where: { id, workspaceId },
@@ -1689,7 +1659,7 @@ export async function updateFilamentState(formData: FormData) {
   });
 
   if (!current) {
-    throw new Error("Filament record not found");
+    throw new Error("Unauthorized");
   }
 
   const expectedUpdatedAt = optionalDateValue(formData, "currentUpdatedAt");
@@ -1778,6 +1748,12 @@ export async function updateFilamentState(formData: FormData) {
     },
   });
   revalidatePath("/filament");
+  logInfo("mutations.filament_state_update_succeeded", {
+    workspaceId,
+    userId,
+    filamentId: id,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export async function createMaintenanceLog(formData: FormData) {
@@ -1961,6 +1937,7 @@ export async function stageInventoryNotesImport(formData: FormData) {
 }
 
 export async function applyStagedImport(formData: FormData) {
+  const startedAt = Date.now();
   const { userId, workspaceId } = await getWorkspaceContext();
   const logContext = await getRequestLogContext({ userId, workspaceId });
   const jobId = requiredString(formData, "jobId");
@@ -1989,6 +1966,7 @@ export async function applyStagedImport(formData: FormData) {
     ...logContext,
     importJobId: job.id,
     entityType: job.entityType,
+    durationMs: Date.now() - startedAt,
   });
   revalidateImportApply(job.entityType);
   if (returnTo) {
@@ -1997,6 +1975,7 @@ export async function applyStagedImport(formData: FormData) {
 }
 
 export async function applyAllStagedImports(formData: FormData) {
+  const startedAt = Date.now();
   const { userId, workspaceId } = await getWorkspaceContext();
   const logContext = await getRequestLogContext({ userId, workspaceId });
   const returnTo = optionalString(formData, "returnTo");
@@ -2049,6 +2028,7 @@ export async function applyAllStagedImports(formData: FormData) {
     ...logContext,
     appliedJobs: appliedJobs.length,
     entityTypes: appliedJobs.map((job) => job.entityType),
+    durationMs: Date.now() - startedAt,
   });
   revalidatePaths([
     "/imports",
